@@ -1,5 +1,6 @@
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include "precision.h"
 #include "smoother.h"
@@ -54,11 +55,11 @@ void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int n
     for( int j=buf; j <= nY-buf; j++ ){
       for( int i=buf; i <= nX-buf; i++ ){
         smLocal = 0.0;
-        for( int jj=-buf; j <= buf; j++ ){
-          for( int ii=-buf; i <= buf; i++ ){
+        for( int jj=-buf; jj <= buf; jj++ ){
+          for( int ii=-buf; ii <= buf; ii++ ){
             iel = (i+ii)+(j+jj)*nX;
             ism = (ii+buf) + (jj+buf)*N;
-            smLocal += f[iel]*smoothOperator->weights[iel];
+            smLocal += f[iel]*smoothOperator->weights[ism];
           }
         }
         iel = i+j*nX;
