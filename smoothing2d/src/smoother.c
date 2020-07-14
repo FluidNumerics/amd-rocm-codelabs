@@ -1,0 +1,78 @@
+
+#include <math.h>
+#include <stdlib.h>
+#include "precision.h"
+#include "smoother.h"
+
+void smootherInit( struct smoother *smoothOperator)
+{
+
+  // Hard-set the smoothing stencil to 5x5 grid cells
+  int N = 5;
+  smoothOperator->dim = N; 
+  smoothOperator->weights = (real*)malloc( N*N*sizeof(real) ); 
+
+  real shift = (real)(N-1)/2.0;
+  real wsum = 0.0;
+  real x;
+  real y;
+  real r;
+  // Initialize memory to 0.0
+  for( int j=0; j < N; j++ ){
+    y = (real)j -shift;
+    for( int i=0; i < N; i++ ){
+      x = (real)i -shift;
+      r = -(pow(x,2.0)+pow(y,2.0));
+      wsum += exp(r);
+      smoothOperator->weights[i+j*N] = exp(r);
+    }
+  }
+
+  for( int j=0; j < N; j++ ){
+    for( int i=0; i < N; i++ ){
+      smoothOperator->weights[i+j*N] = smoothOperator->weights[i+j*N]/wsum;
+    }
+  }
+}  
+
+// Manual Destructor : Frees space held by the smoothOperator
+void smootherFree( struct smoother *smoothOperator )
+{
+  free( smoothOperator->weights );
+}
+
+void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int nX, int nY, int nIter )
+{
+  int i, j, iel, ism;
+  int N = (real)smoothOperator->dim;
+  int buf = (real)(smoothOperator->dim-1)/2.0;
+  real smLocal;
+
+
+  for( int iter=0; iter < nIter; iter++){
+
+    for( int j=buf; j <= nY-buf; j++ ){
+      for( int i=buf; i <= nX-buf; i++ ){
+        smLocal = 0.0;
+        for( int jj=-buf; j <= buf; j++ ){
+          for( int ii=-buf; i <= buf; i++ ){
+            iel = (i+ii)+(j+jj)*nX;
+            ism = (ii+buf) + (jj+buf)*N;
+            smLocal += f[iel]*smoothOperator->weights[iel];
+          }
+        }
+        iel = i+j*nX;
+        smoothF[iel] = smLocal;
+      }
+    }
+    // Update interior points of "f" for next iterate
+    for( int j=buf; j <= nY-buf; j++ ){
+      for( int i=buf; i <= nX-buf; i++ ){
+        iel = i+j*nX;
+        f[iel] = smoothF[iel];
+      }
+    }
+
+  }
+  
+}
