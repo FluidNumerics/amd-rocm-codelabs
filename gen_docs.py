@@ -4,6 +4,7 @@ import subprocess
 import shlex
 import shutil
 import json
+import datetime
 
 index='''
 <!DOCTYPE html>
@@ -30,12 +31,15 @@ index='''
 	</div>
 
 	<div class="fluid_header">
-		<h1>Fluid Slurm-GCP Codelabs</h1>
+		<h1>Portable GPU Programming Codelabs</h1>
+		<h2>Accelerate science on all platforms.</h2>
+		<h3><i>Supported by AMD & Fluid Numerics</i></h3>
 	</div>
 
 	<div class="fluid_body">
 
 	    <h2><a href="https://www.fluidnumerics.com">Head back to Fluid Numerics</a></h2>
+            [BODY]
 
         </div>
 
@@ -97,9 +101,36 @@ def update_codelabs():
 
 #END update_codelabs
 
+def update_index():
+
+   
+    with open('./docs.json') as f:
+        config = json.load(f)
+
+    timeStamp = datetime.datetime.now().strftime("%Y-%m-%d")
+    indexBody = '<p><i>Last Updated : {}</i></p> <br> <hr> <br>\n'.format(timeStamp)
+
+    # Update tutorials
+    for tutorial in config['docs']:
+    
+        indexBody += '<h2><a href="./{SUBDIR}/index.html">{TITLE}</a></h2> \n '.format(SUBDIR=tutorial['subdirectory'],
+                                                                                      TITLE=tutorial['title'])
+ 
+        indexBody += '<p>{DESCRIPTION}</p><br> <hr> <br>\n'.format(DESCRIPTION=tutorial['description'])
+
+    mainPageIndex = index.replace('[BODY]',indexBody)
+
+    f = open('public/index.html','w')
+    f.write(mainPageIndex)    
+    f.close()
+
+#END upate_index
+
 def main():
 
+    update_index()
     update_codelabs()
+
 
 
 #END main

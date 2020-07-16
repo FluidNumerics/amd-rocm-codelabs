@@ -1,0 +1,26 @@
+{
+  "environment": "web",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2020-07-15T22:47:27Z",
+  "id": "URL",
+  "duration": 20,
+  "title": "Building a basic GPU accelerated application with HIP in C/C++",
+  "authors": "Joseph Schoonover",
+  "summary": "This codelab will walk you through the basics of CPU and GPU memory management and GPU kernel launching with HIP in C/C++",
+  "source": "1GYt1m-GJx1M9VFVIeOT90XbXKACoUhT1wu94jGc_9NY",
+  "theme": "hpc",
+  "status": [
+    "published"
+  ],
+  "category": [
+    "HPC"
+  ],
+  "tags": [
+    "web"
+  ],
+  "feedback": "TO DO",
+  "ga": "TO DO",
+  "url": "URL"
+}

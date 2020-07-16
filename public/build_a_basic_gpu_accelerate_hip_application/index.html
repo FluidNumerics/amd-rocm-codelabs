@@ -1,0 +1,435 @@
+
+
+<!doctype html>
+
+
+
+<html>
+
+<head>
+
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+
+  <meta name="theme-color" content="#4F7DC9">
+
+  <meta charset="UTF-8">
+
+  <title>Building a basic GPU accelerated application with HIP in C/C&#43;&#43;</title>
+
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+
+  <style>
+
+    .success {
+
+      color: #1e8e3e;
+
+    }
+
+    .error {
+
+      color: red;
+
+    }
+
+  </style>
+
+
+<!-- update the version number as needed -->
+<script defer src="/__/firebase/7.9.3/firebase-app.js"></script>
+<!-- include only the Firebase features as you need -->
+<script defer src="/__/firebase/7.9.3/firebase-auth.js"></script>
+<script defer src="/__/firebase/7.9.3/firebase-database.js"></script>
+<script defer src="/__/firebase/7.9.3/firebase-messaging.js"></script>
+<script defer src="/__/firebase/7.9.3/firebase-storage.js"></script>
+<!-- initialize the SDK after all desired features are loaded -->
+<script defer src="/__/firebase/init.js"></script>
+
+</head>
+
+<body>
+
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+
+  <google-codelab codelab-gaid="TO DO"
+
+                  id="URL"
+
+                  title="Building a basic GPU accelerated application with HIP in C/C&#43;&#43;"
+
+                  environment="web"
+
+                  feedback-link="TO DO">
+
+    
+
+      <google-codelab-step label="Introduction" duration="0">
+
+        <p><strong>Last Updated:</strong> 2020-13-07</p>
+
+<h2 is-upgraded><strong>GPU Programming Basics</strong></h2>
+
+<h3 is-upgraded><strong>Infrastructure</strong></h3>
+
+<p class="image-container"><img style="width: 348.50px" src="img/eb4f4a95fc0a22c0.png"></p>
+
+<p>Conceptually, you can think of a simple GPU accelerated system in the following way</p>
+
+<ul>
+
+<li>A CPU &#34;Chip&#34; with O(1) - O(10)  CPU cores with shared RAM amongst the CPU cores</li>
+
+<li>A GPU with its own RAM</li>
+
+</ul>
+
+<p>Because GPUs have their own distinct memory space, developers looking to accelerate applications with GPUs must be able to manage both CPU and GPU memory. </p>
+
+<p>Before executing routines on the GPU, data must be present in GPU memory. This implies that either (1) Data must be transferred from the CPU to the GPU or (2) the data must be initialized/set on the GPU directly.</p>
+
+<p>Some metrics to be aware of</p>
+
+<ul>
+
+<li>CPU RAM Bandwidth - </li>
+
+<li>PCIe Bandwidth (Theoretical Unidirectional)</li>
+
+<li>Gen3 x16- ~8 GB/s</li>
+
+<li>Gen4 x16- ~16 GB/s</li>
+
+</ul>
+
+<p>What we have presented here is purposefully simplified to help us focus on just the basics of GPU programming, namely, working with GPU and CPU memory and launching kernels. Tuning a GPU accelerated application for specific hardware requires a much more refined mental model for the hardware you plan to run on. </p>
+
+<p>Specialized hardware</p>
+
+<ul>
+
+<li>AMD Infinity Fabric</li>
+
+<li>NVLink hardware</li>
+
+<li>Node-to-Node interconnects</li>
+
+<li>Slingshot</li>
+
+<li>NVSwitch</li>
+
+<li>Infiniband</li>
+
+</ul>
+
+<p>Resources - <a href="https://arxiv.org/pdf/1903.04611.pdf" target="_blank">https://arxiv.org/pdf/1903.04611.pdf</a></p>
+
+<table>
+
+<tr><td colspan="1" rowspan="1"><p>PCIe Generations and Transfer Rates</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>PCIe Generation</p>
+
+</td><td colspan="1" rowspan="1"><p>Maximum Transfer Rate</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>Gen1</p>
+
+</td><td colspan="1" rowspan="1"><p>2.5 Gb/s</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>Gen2</p>
+
+</td><td colspan="1" rowspan="1"><p>5.0 Gb/s</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>Gen3</p>
+
+</td><td colspan="1" rowspan="1"><p>8.0 Gb/s</p>
+
+</td></tr>
+
+</table>
+
+<p>More exotic hardware exists, e.g.</p>
+
+<ul>
+
+<li>SIngle socket, multi-GPU systems</li>
+
+<li>Dual/Multi-Socket, multi-GPU systems</li>
+
+</ul>
+
+<p>On any GPU accelerated platform, it is difficult to understand how to obtain optimal performance without </p>
+
+<ul>
+
+<li>working knowledge of hardware performance limitations, </li>
+
+<li>the paths data must take to go from core X to GPU Y,</li>
+
+</ul>
+
+<p>Often, the first hurdle developers face in GPU acceleration is in minimizing data transfers between the CPU and GPU. After porting a few routines onto the GPU, developers often see overall increases in application runtime, simply because their application is still migrating data between CPU and GPU. This is ok! As more routines are ported to the GPU, opportunities will naturally arise for eliminating data transfers until all data transfers, except for those associated with file IO, are eliminated.</p>
+
+<h3 is-upgraded><strong>GPU Programming APIs</strong></h3>
+
+<p>When we refer to GPU programming here, we are specifically referring to programming GPUs for general purpose applications and not necessarily just graphics processing operations. This is often referred to as General Purpose GPU programming.</p>
+
+<p>GPU Programming APIs must be able to </p>
+
+<ul>
+
+<li>Manage memory on the GPU</li>
+
+<li>Allocate and deallocate GPU Memory</li>
+
+<li>Update GPU Memory from CPU</li>
+
+<li>Update CPU Memory from GPU</li>
+
+<li>Manage execution of routines</li>
+
+</ul>
+
+<p>Synchronous and Asynchronous operations</p>
+
+<p>Examples of General Purpose GPU Programming APIs</p>
+
+<ul>
+
+<li>CUDA (Nvidia Only)</li>
+
+<li>OpenCL (highly portable)</li>
+
+</ul>
+
+<h2 is-upgraded><strong>HIP</strong></h2>
+
+<p>From <a href="https://www.olcf.ornl.gov/wp-content/uploads/2019/05/frontier_specsheet_v4.pdf" target="_blank">https://www.olcf.ornl.gov/wp-content/uploads/2019/05/frontier_specsheet_v4.pdf</a></p>
+
+<p>The OLCF plans to make HIP available on Summit so that users can begin using it prior to its availability on Frontier. HIP is a C++</p>
+
+<p>runtime API that allows developers to write portable code to run on AMD and NVIDIA GPUs. It is essentially a wrapper that uses</p>
+
+<p>the underlying CUDA or ROCm platform that is installed on a system. The API is very similar to CUDA so transitioning existing</p>
+
+<p>codes from CUDA to HIP should be fairly straightforward in most cases. In addition, HIP provides porting tools which can be used</p>
+
+<p>to help port CUDA codes to the HIP layer, with no loss of performance as compared to the original CUDA application. HIP is not</p>
+
+<p>intended to be a drop-in replacement for CUDA, and developers should expect to do some manual coding and performance</p>
+
+<p>tuning work to complete the port.</p>
+
+<p>Some key features include:</p>
+
+<p>• HIP is very thin and has little or no performance impact over coding directly in CUDA or hcc &#34;HC&#34; mode.</p>
+
+<p>• HIP allows coding in a single-source C++ programming language including features such as templates, C++11 lambdas,</p>
+
+<p>classes, namespaces, and more.</p>
+
+<p>• The &#34;hipify&#34; tool automatically converts source from CUDA to HIP.</p>
+
+<p>• Developers can specialize for the platform (CUDA or hcc) to tune for performance or handle tricky cases</p>
+
+<h2 is-upgraded><strong>GPU Porting Workflow</strong></h2>
+
+<p class="image-container"><img style="width: 233.25px" src="img/fb9a02e8f06a74cb.png"></p>
+
+<h2 is-upgraded><strong>What you will build</strong></h2>
+
+<p>In this codelab, you are going to transition a mini-application, written in C, from a CPU-only application to a portable GPU accelerated application, using AMD&#39;s HIP. You will learn a basic porting strategy that will enable you to begin tackling ports of larger application</p>
+
+<h2 is-upgraded><strong>What you will learn</strong></h2>
+
+<ul>
+
+<li>How to manage GPU memory with HIP</li>
+
+<li>How to launch GPU accelerated kernels with HIP</li>
+
+<li>How to build GPU accelerated C/C++ applications for AMD and Nvidia platforms with a simple Makefile</li>
+
+<li>How to verify GPU memory allocation and kernel execution with the rocprof profiler</li>
+
+</ul>
+
+<h2 is-upgraded><strong>What you will need</strong></h2>
+
+<ul>
+
+<li>A compute platform with AMD or Nvidia GPU(s)</li>
+
+<li>Linux operating system (e.g. Debian, Ubuntu, CentOS, or RHEL)</li>
+
+<li>Working installation of <a href="https://rocm-documentation.readthedocs.io/en/latest/Installation_Guide/Installation-Guide.html" target="_blank">ROCm-dev</a></li>
+
+<li>Basic Command-Line Linux Experience</li>
+
+<li>Working C or C++ compiler</li>
+
+</ul>
+
+<aside class="warning"><p><strong>Note:</strong></p>
+
+</aside>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Clone and Run the Demo Application (CPU-Only)" duration="10">
+
+        <p>In this section, we introduce the demo application and walk through building and verifying the example. It&#39;s important to make sure that the code produces the expected result as we will be using the CPU generated model output to ensure that the solution does not change when we port to the GPU. </p>
+
+<aside class="special"><p><strong>Tip:</strong> In practice, it&#39;s ideal to define tests for all of your routines as standalone (unit-tests) and/or in concert together (integration-tests). These tests would ideally be run regularly during development and with every commit to your code&#39;s repository.</p>
+
+</aside>
+
+<p>This application executes a 2-D smoothing operation on a square grid of points. The program proceeds as follows</p>
+
+<ol type="1" start="1">
+
+<li>Allocate memory for smoother class - 5x5 stencil with Gaussian weights</li>
+
+<li>Allocate memory for function and smoothed function</li>
+
+<li>Initialize function on CPU and report function to file</li>
+
+<li>Call smoothing function</li>
+
+<li>Report smoothed function to file</li>
+
+<li>Clear memory</li>
+
+</ol>
+
+<h2 is-upgraded><strong>Code Structure</strong></h2>
+
+<h2 is-upgraded><strong>Install and Verify the Application</strong></h2>
+
+<p>To get started...</p>
+
+<ol type="1" start="1">
+
+<li>Clone the repository</li>
+
+<li>Build the example</li>
+
+<li>Test run the example</li>
+
+<li>(Optional) Visualize the output</li>
+
+<li>Save the output in another directory. We will compare with this output with each change we make to the code.</li>
+
+</ol>
+
+<p>Example visualized output from the smooth2d example program. The initial field is shown on the top, and the smoothed field is shown on the bottom after 10 iterations.<img style="width: 624.00px" src="img/339004e3869450ed.png"></p>
+
+<h2 is-upgraded><strong>Profile the Application</strong></h2>
+
+<aside class="warning"><p><strong>Caution: </strong></p>
+
+</aside>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Moving Data to the GPU with HIP" duration="5">
+
+        <h2 is-upgraded><strong>hipMalloc</strong></h2>
+
+<h2 is-upgraded><strong>hipMemcpy</strong></h2>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Offload the Smoothing Kernel to the GPU" duration="5">
+
+        
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Congratulations" duration="0">
+
+        <p>In this codelab, you</p>
+
+<ul>
+
+<li>Created a valid cluster-configuration file and modified it to customize your cluster</li>
+
+<li>Configured and tested a multi-region (globally scalable) compute partition</li>
+
+</ul>
+
+<h2 is-upgraded><strong>What&#39;s next?</strong></h2>
+
+<p><a href="http://codelabs.fluidnumerics.com/create-a-high-availability-compute-partition" target="_blank">Learn how to configure a high availability compute partition (multi-zone)</a></p>
+
+<p><a href="https://docs.google.com/forms/d/e/1FAIpQLSd7EN_ptBOJ9Eg2vH-Bs95j8pD2sjaTAwdcLoWDBVmF0fVEfg/viewform?usp=sf_link" target="_blank">Submit your feedback and request new codelabs using our feedback form</a></p>
+
+<h2 is-upgraded><strong>Further reading</strong></h2>
+
+<p><a href="https://cloud.google.com/compute/docs/instances/managing-instance-access" target="_blank">Learn how to configure OS-Login to ssh to your cluster with 3rd party ssh tools</a></p>
+
+<p><a href="https://cloud.google.com/compute/docs/oslogin/manage-oslogin-in-an-org" target="_blank">Learn how to manage POSIX user information with the directory API</a></p>
+
+<h2 is-upgraded><strong>Reference docs</strong></h2>
+
+<p><a href="https://help.fluidnumerics.com/slurm-gcp" target="_blank">https://help.fluidnumerics.com/slurm-gcp</a></p>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+  </google-codelab>
+
+
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+
+
+
+</body>
+
+</html>
+

@@ -2,7 +2,7 @@
   "docs":
   [
     {
-     "title":"Codelab tutorial : Building a basic GPU accelerated application with HIP in C++",
+     "title":"Building a basic GPU accelerated application with HIP in C++",
      "gdoc_id":"1GYt1m-GJx1M9VFVIeOT90XbXKACoUhT1wu94jGc_9NY",
      "author":"Joseph Schoonover",
      "author_affiliation": "Fluid Numerics LLC",
