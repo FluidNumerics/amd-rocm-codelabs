@@ -13,4 +13,4 @@ void smootherInit( struct smoother *smoothOperator);
 void smootherFree( struct smoother *smoothOperator );
 
 // Additional routines
-void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int nX, int nY, int nIter );
+void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int nX, int nY);

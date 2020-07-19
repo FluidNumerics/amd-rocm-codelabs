@@ -10,6 +10,17 @@
 #endif
 
 
+void resetF( real *f, real *smoothF, int nx, int ny ){
+  int iel;
+  // Reassign smoothF to f
+  for( int iy=0; iy<ny; iy++ ){
+    for( int ix=0; ix<nx; ix++ ){
+      iel = ix + nx*iy;
+      f[iel] = smoothF[iel];
+    }
+  } 
+}
+
 int main( int argc, char *argv[] )  {
   smoother smoothOperator;
   int nx, ny, nElements;
@@ -67,8 +78,12 @@ int main( int argc, char *argv[] )  {
   } 
   fclose(fp);
 
-  // Run the smoother
-  smoothField( &smoothOperator, f, smoothF, nx, ny, nIter );
+  for( int iter=0; iter<nIter; iter++){
+    // Run the smoother
+    smoothField( &smoothOperator, f, smoothF, nx, ny );
+    // Reassign smoothF to f
+    resetF( f, smoothF, nx, ny );
+  }
 
   // Write smoothF to file
   fp = fopen("./smooth-function.txt", "w");

@@ -42,38 +42,26 @@ void smootherFree( struct smoother *smoothOperator )
   free( smoothOperator->weights );
 }
 
-void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int nX, int nY, int nIter )
+void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int nX, int nY )
 {
   int i, j, iel, ism;
   int N = (real)smoothOperator->dim;
   int buf = (real)(smoothOperator->dim-1)/2.0;
   real smLocal;
 
-
-  for( int iter=0; iter < nIter; iter++){
-
-    for( int j=buf; j <= nY-buf; j++ ){
-      for( int i=buf; i <= nX-buf; i++ ){
-        smLocal = 0.0;
-        for( int jj=-buf; jj <= buf; jj++ ){
-          for( int ii=-buf; ii <= buf; ii++ ){
-            iel = (i+ii)+(j+jj)*nX;
-            ism = (ii+buf) + (jj+buf)*N;
-            smLocal += f[iel]*smoothOperator->weights[ism];
-          }
+  for( int j=buf; j <= nY-buf; j++ ){
+    for( int i=buf; i <= nX-buf; i++ ){
+      smLocal = 0.0;
+      for( int jj=-buf; jj <= buf; jj++ ){
+        for( int ii=-buf; ii <= buf; ii++ ){
+          iel = (i+ii)+(j+jj)*nX;
+          ism = (ii+buf) + (jj+buf)*N;
+          smLocal += f[iel]*smoothOperator->weights[ism];
         }
-        iel = i+j*nX;
-        smoothF[iel] = smLocal;
       }
+      iel = i+j*nX;
+      smoothF[iel] = smLocal;
     }
-    // Update interior points of "f" for next iterate
-    for( int j=buf; j <= nY-buf; j++ ){
-      for( int i=buf; i <= nX-buf; i++ ){
-        iel = i+j*nX;
-        f[iel] = smoothF[iel];
-      }
-    }
-
   }
   
 }

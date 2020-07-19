@@ -1,13 +1,12 @@
 
 CC=gcc
-OPT=-O0 -g -pg
+OPT=-O0 -g
 LIB=-lm
 INC=
 
 .PHONY: clean
 
-
-example: main.o smoother.o
+smoother2d: main.o smoother.o
 	${CC} ${OPT} *.o ${LIB} ${INC} -o $@
 
 main.o : main.c smoother.o
@@ -17,4 +16,4 @@ smoother.o : smoother.c
 	${CC} ${OPT} -c smoother.c ${LIB} ${INC} -o $@
 
 clean :
-	rm *.o
+	rm *.o smoother2d
