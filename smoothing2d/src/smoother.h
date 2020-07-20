@@ -17,5 +17,3 @@ void smootherFree( struct smoother *smoothOperator );
 void resetF( real *f, real *smoothF, int nx, int ny, int buf );
 
 void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int nX, int nY);
-
-__global__ void smoothField_gpu( real *weights_dev, real *f_dev, real *smoothF_dev, int nX, int nY, int N );

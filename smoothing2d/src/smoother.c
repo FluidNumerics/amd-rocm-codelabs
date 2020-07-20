@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include "precision.h"
 #include "smoother.h"
-#include <hip/hip_runtime.h>
 
 void smootherInit( struct smoother *smoothOperator)
 {
@@ -35,21 +34,12 @@ void smootherInit( struct smoother *smoothOperator)
       smoothOperator->weights[i+j*N] = smoothOperator->weights[i+j*N]/wsum;
     }
   }
-
-  hipMalloc(&smoothOperator->weights_dev,N*N*sizeof(real));
-  
-  hipMemcpy(smoothOperator->weights_dev,
-            smoothOperator->weights,
-            N*N*sizeof(real),
-            hipMemcpyHostToDevice);
 }  
 
 // Manual Destructor : Frees space held by the smoothOperator
 void smootherFree( struct smoother *smoothOperator )
 {
   free( smoothOperator->weights );
-
-  hipFree(smoothOperator->weights_dev);
 }
 
 void resetF( real *f, real *smoothF, int nx, int ny, int buf ){
@@ -85,25 +75,3 @@ void smoothField( struct smoother *smoothOperator, real *f, real *smoothF, int n
     }
   }
 }
-
-__global__ void smoothField_gpu( real *weights_dev, real *f_dev, real *smoothF_dev, int nX, int nY, int N )
-{
-  int buf = (real)(N-1)/2.0;
-  size_t i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x + buf;
-  size_t j = hipThreadIdx_y + hipBlockIdx_y*hipBlockDim_y + buf;
-  int iloc, ism;
-  
-  if( i >= buf && i < nX-buf && j >= buf && j< nY-buf){
-    real smLocal = 0.0;
-    for( int jj=-buf; jj <= buf; jj++ ){
-      for( int ii=-buf; ii <= buf; ii++ ){
-        iloc = (i+ii)+(j+jj)*nX;
-        ism = (ii+buf) + (jj+buf)*N;
-        smLocal += f_dev[iloc]*weights_dev[ism];
-      }
-    }
-    int iel= i+j*nX;
-    smoothF_dev[iel] = smLocal;
-  }
-}
-

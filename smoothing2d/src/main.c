@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include "precision.h"
 #include "smoother.h"
-#include <hip/hip_runtime.h>
 
 #ifndef pi
 #define pi 3.1415926535897932384626433832795
@@ -18,7 +17,6 @@ int main( int argc, char *argv[] )  {
   int nIter;
   real dx;
   real *f, *smoothF;
-  real *f_dev, *smoothF_dev;
 
   if( argc == 3 ) {
      nx = atoi(argv[1]);
@@ -42,17 +40,9 @@ int main( int argc, char *argv[] )  {
   smootherInit(&smoothOperator);
   int buf = (real)(smoothOperator.dim-1)/2.0;
 
-  int threadsPerBlockX = 8;
-  int threadsPerBlockY = 8;
-  int gridDimX = (nx-2*buf)/threadsPerBlockX+1;
-  int gridDimY = (ny-2*buf)/threadsPerBlockY+1;
-
   // Allocate space for the function we want to smooth
   f  = (real*)malloc( nElements*sizeof(real) );
   smoothF = (real*)malloc( nElements*sizeof(real) );
-
-  hipMalloc(&f_dev, nElements*sizeof(real));
-  hipMalloc(&smoothF_dev, nElements*sizeof(real));
 
   real y;
   real x;
@@ -79,23 +69,10 @@ int main( int argc, char *argv[] )  {
   } 
   fclose(fp);
 
-
-  hipMemcpy(smoothF_dev, smoothF, nElements*sizeof(real), hipMemcpyHostToDevice);
-
   for( int iter=0; iter<nIter; iter++){
 
-  // Copy f from host to device : f is input to `smoothField`
-    hipMemcpy(f_dev, f, nElements*sizeof(real), hipMemcpyHostToDevice);
-
     // Run the smoother
-    hipLaunchKernelGGL((smoothField_gpu), dim3(gridDimX,gridDimY,1), dim3(threadsPerBlockX,threadsPerBlockY,1), 0, 0,
-                        smoothOperator.weights_dev, f_dev, smoothF_dev, nx, ny, smoothOperator.dim );
-
-    // Copy smoothF_dev from device to host
-    hipMemcpy(smoothF, smoothF_dev, nElements*sizeof(real), hipMemcpyDeviceToHost);
-
-    // Run the smoother
-//    smoothField( &smoothOperator, f, smoothF, nx, ny );
+    smoothField( &smoothOperator, f, smoothF, nx, ny );
 
     // Reassign smoothF to f
     resetF( f, smoothF, nx, ny, buf );
@@ -114,9 +91,6 @@ int main( int argc, char *argv[] )  {
   // Free space
   free(f);
   free(smoothF);
-
-  hipFree(f_dev);
-  hipFree(smoothF_dev);
 
   smootherFree(&smoothOperator);
 
