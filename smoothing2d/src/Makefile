@@ -1,6 +1,8 @@
 
-CC=gcc
+#CC=gcc
+CC=hipcc
 OPT=-O0 -g
+# -DGPU
 LIB=-lm
 INC=
 
