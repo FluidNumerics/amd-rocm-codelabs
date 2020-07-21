@@ -4,3 +4,5 @@ gmon.out
 *.eps
 *.png
 example
+smoother2d
+env/

@@ -69,7 +69,7 @@
 
       <google-codelab-step label="Introduction" duration="0">
 
-        <p><strong>Last Updated:</strong> 2020-17-07</p>
+        <p><strong>Last Updated:</strong> 2020-20-07</p>
 
 <p>Over the last few decades, there has been increased interest in using Graphics Processing Units (GPUs) to perform general purpose computing tasks. This practice is often referred to as General Purpose GPU (GPGPU) programming. Using GPUs for general purpose computing tasks gained attention primarily due to the inherent scale of parallelism within GPU hardware that enables faster computation and a reduction in the time-to-solution.</p>
 
@@ -805,7 +805,7 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
 </aside>
 
-<h3 is-upgraded><strong>Next steps</strong></h3>
+<h2 is-upgraded><strong>Next steps</strong></h2>
 
 <p>At this point, you now have the necessary data declared on the GPU. Additionally, you used hipMemcpy to make the input to smoothField available on the GPU. In the next step, you will create a HIP kernel that will run the smoothField algorithm on the GPU and replace the call to smoothField with a call to launch this kernel.</p>
 
@@ -817,19 +817,27 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
     
 
-      <google-codelab-step label="Offload the Smoothing Kernel to the GPU" duration="20">
+      <google-codelab-step label="HIP Kernel Launch Basics" duration="10">
 
-        <p>In this section, you will offload the smoothField routine to the GPU.</p>
+        <p>Routines that are executed on the GPU are typically scheduled to run by issuing instructions from the host (CPU). In HIP, a GPU kernel is launched through a call to hipLaunchKernelGGL. When scheduling GPU kernel execution,  you specify </p>
 
-<h2 is-upgraded><strong>GPU Kernel Launch Basics</strong></h2>
+<ol type="1" start="1">
 
-<p>Routines that are executed on the GPU are typically scheduled to run by issuing instructions from the host (CPU). In HIP, a GPU kernel is launched through an API call to hipLaunchKernelGGL. When scheduling GPU kernel execution, the HIP API allows you to specify the number of threads needed to execute the kernel. Threads are grouped into blocks that share local memory. </p>
+<li>The kernel name,</li>
 
-<aside class="warning"><p><strong>Caution: </strong>The number of threads per block, number of blocks, and the amount of shared memory per block are limited; these limits can be found using <a href="https://github.com/RadeonOpenCompute/rocminfo" target="_blank">rocminfo</a> on AMD platforms and the <a href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#running-binaries" target="_blank">deviceQuery CUDA-Toolkit example</a> on Nvidia platforms. </p>
+<li>The number of threads and the thread grouping,</li>
 
-</aside>
+<li>The amount of Local Data Share (LDS) memory (Shared Memory) per block, and </li>
 
-<p>All GPU threads will execute instructions asynchronously, consistent Same-Instruction-Multiple-Data (SIMD) parallelism, where each thread executes the same set of instructions. When a HIP kernel is launched, each thread executes its own copy of the instructions. Within a HIP kernel, you are able to use HIP intrinsics to determine the block ID of a thread, the local thread ID within the block, and the number of threads in each block. These intrinsics are summarized the table below.</p>
+<li>The stream ID.</li>
+
+</ol>
+
+<h2 is-upgraded><strong>Threads, Blocks, and LDS Memory</strong></h2>
+
+<p>When a kernel is launched, all requested threads on the GPU execute the kernel instructions concurrently. How the threads are scheduled to execute the instructions depends on the thread grouping. Threads are grouped into blocks in the HIP and CUDA programming models. Threads within a block are able to share LDS memory and L1 Cache on GPU Compute Units (Streaming Multiprocessor in Nvidia/CUDA terminology).</p>
+
+<p>Within a HIP kernel, you are able to use HIP intrinsics to determine the unique ID of a thread. This allows you to codify memory access patterns for each thread within a kernel and expose SIMD parallelism. These intrinsics are summarized the table below.</p>
 
 <table>
 
@@ -847,7 +855,7 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
 <tr><td colspan="1" rowspan="1"><p>hipBlockDimx_[x,y,z]</p>
 
-</td><td colspan="1" rowspan="1"><p>The number of threads within each blockin the [x,y,z] grid directions.</p>
+</td><td colspan="1" rowspan="1"><p>The number of threads within each block in the [x,y,z] grid directions.</p>
 
 </td></tr>
 
@@ -859,9 +867,53 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
 </table>
 
-<aside class="special"><p><strong>Note:</strong> Block (threads-per-block) and Grid dimensions (number-of-blocks) are expressed as <a href="https://github.com/ROCm-Developer-Tools/HIP/blob/master/docs/markdown/hip_kernel_language.md#dim3" target="_blank">dim3</a> variables, giving 3 dimensions (x,y,z) </p>
+<aside class="special"><p><strong>Note:</strong> Block dimensions (threads-per-block) and Grid dimensions (number-of-blocks) are expressed as <a href="https://github.com/ROCm-Developer-Tools/HIP/blob/master/docs/markdown/hip_kernel_language.md#dim3" target="_blank">dim3</a> variables, giving 3 dimensions (x,y,z). </p>
 
 </aside>
+
+<h3 is-upgraded><strong>Example</strong></h3>
+
+<p>To see how this works, consider this simple example kernel that takes in a device array and returns the same array multiplied by two.</p>
+
+<pre><code>__global__ void myKernel(int N, double *d_a) {
+
+  int i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x;
+
+  if (i&lt;N) {
+
+    d_a[i] *= 2.0;
+
+  }
+
+}</code></pre>
+
+<p>In this example, when the kernel is launched, each thread will calculate i based on its thread ID within a block, its block ID, and the number of threads-per-block (hipBlockDimx_x). A conditional is added to ensure that threads only access in-bounds addresses of d_a. Provided this conditional is met for a thread, that thread will double the i-th element of d_a, concurrently with other threads.</p>
+
+<h3 is-upgraded><strong>Best practice</strong></h3>
+
+<p>On AMD GPUs, threads in a block are executed in 64-wide chunks called &#34;wavefronts&#34;. Because of this, it is good practice is to make block sizes a multiple of 64 on AMD GPUs.</p>
+
+<p>On Nvidia GPUs, threads in a block are executed in 32-wide chunks called &#34;warps&#34; and it is good practice is to make the block size a multiple of 32.</p>
+
+<aside class="warning"><p><strong>Caution: </strong>The number of threads per block, number of blocks, and the amount of local dynamic memory per block are limited; these limits can be found using <a href="https://github.com/RadeonOpenCompute/rocminfo" target="_blank">rocminfo</a> on AMD platforms and the <a href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#running-binaries" target="_blank">deviceQuery CUDA-Toolkit example</a> on Nvidia platforms. </p>
+
+</aside>
+
+<h2 is-upgraded><strong>Streams</strong></h2>
+
+<p>In this codelab, we will always set the stream ID to 0. Using multiple streams is useful when you want to run multiple GPU kernels concurrently. This strategy is useful when you are having difficulty keeping GPUs fully subscribed and you have code that has instruction-level parallelism.</p>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Offload the Smoothing Kernel to the GPU" duration="20">
+
+        <p>In this section, you will offload the smoothField routine to the GPU.</p>
 
 <h2 is-upgraded><strong>Planning the GPU port</strong></h2>
 
@@ -957,7 +1009,11 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
   int gridDimY = (nY-2*buf)/threadsPerBlockY + 1;</code></pre>
 
-<aside class="special"><p><strong>Note:</strong> In general, the number of threads-per-block will impact the application runtime and you will want to use a suitable profiler to help optimize performance.</p>
+<aside class="special"><p><strong>Note:</strong> In general, the number of threads-per-block will impact the application runtime and you will want to use a suitable profiler to help optimize performance. </p>
+
+<p>On AMD platforms, threads in a block are executed in 64-wide chunks called &#34;wavefronts&#34; and it is good practice is to make the block size a multiple of 64.</p>
+
+<p>On Nvidia platforms, threads in a block are executed in 32-wide chunks called &#34;warps&#34; and it is good practice is to make the block size a multiple of 32.</p>
 
 </aside>
 
@@ -1053,6 +1109,92 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
     hipMemcpy(smoothF, smoothF_dev, nElements*sizeof(real), hipMemcpyDeviceToHost);</code></pre>
 
+<ol type="1" start="4">
+
+<li>Rebuild the application. For Nvidia Platforms, you will need to set <code>OPT=-O0 -g -fmad=false</code> before recompiling.</li>
+
+</ol>
+
+<aside class="warning"><p><strong>Caution: </strong>In order to obtain bit-for-bit correctness on Nvidia Platforms, you must add the <code>-fmad=false</code> flag to the <code>OPT</code> variable in the Makefile. This flag disables fused multiply-add operations. Fused Multiply-Add (FMA) operations on the GPU result in improved performance but can cause a difference in the computed solution between <code>smoothField</code> and <code>smoothField_gpu</code>.</p>
+
+</aside>
+
+<pre><code>$ make clean &amp;&amp; make</code></pre>
+
+<ol type="1" start="5">
+
+<li>Verify that the solution output agrees with your reference output</li>
+
+</ol>
+
+<pre><code>$ ./smoother2d 1000 10
+
+$ diff function.txt reference/function.txt
+
+$ diff smooth-function.txt reference/smooth-function.txt</code></pre>
+
+<ol type="1" start="6">
+
+<li>You can verify that the HIP Kernel is running on the GPU by using a profiler.</li>
+
+</ol>
+
+<ol type="1" start="1">
+
+<li>For AMD platforms, use <code>rocprof</code> with the <code>--hip-trace</code> flag. Running rocprof will create a file called <code>profile.json</code>. </li>
+
+<li>For Nvidia platforms, use <code>nvprof</code>. </li>
+
+</ol>
+
+<pre><code>$ nvprof ./smoother2d 1000 10
+
+==9394== NVPROF is profiling process 9394, command: ./smoother2d 1000 10
+
+==9394== Profiling application: ./smoother2d 1000 10
+
+==9394== Profiling result:
+
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+
+ GPU activities:   53.96%  10.307ms        10  1.0307ms  1.0293ms  1.0337ms  smoothField_gpu(float*, float*, float*, int, int, int)
+
+                   23.97%  4.5788ms        12  381.57us  1.4720us  522.30us  [CUDA memcpy HtoD]
+
+                   22.07%  4.2150ms        10  421.50us  407.71us  463.90us  [CUDA memcpy DtoH]
+
+      API calls:   89.23%  189.13ms         3  63.045ms  105.94us  188.86ms  cudaMalloc
+
+                   10.09%  21.383ms        22  971.95us  17.322us  1.7658ms  cudaMemcpy
+
+                    0.25%  533.80us        97  5.5030us     172ns  379.31us  cuDeviceGetAttribute
+
+                    0.24%  512.54us         3  170.85us  163.89us  174.59us  cudaFree
+
+                    0.09%  186.85us         1  186.85us  186.85us  186.85us  cuDeviceTotalMem
+
+                    0.08%  162.32us        10  16.232us  7.4320us  50.629us  cudaLaunchKernel
+
+                    0.02%  38.694us         1  38.694us  38.694us  38.694us  cuDeviceGetName
+
+                    0.00%  3.8060us         1  3.8060us  3.8060us  3.8060us  cuDeviceGetPCIBusId
+
+                    0.00%  1.3010us         3     433ns     208ns     825ns  cuDeviceGetCount
+
+                    0.00%     766ns         2     383ns     186ns     580ns  cuDeviceGet
+
+                    0.00%     300ns         1     300ns     300ns     300ns  cuDeviceGetUuid</code></pre>
+
+<aside class="special"><p><strong>Tip:</strong> Once you have verified your results, make sure that you commit your changes to your local git repository.</p>
+
+</aside>
+
+<h2 is-upgraded><strong>Next steps</strong></h2>
+
+<p>Congratulations! So far, you&#39;ve learned how to allocate and manage memory on the GPU and how to launch a GPU kernel. Right now, we have the code in a state where, every iteration, data is copied to the GPU before calling smoothField_gpu and from the GPU after calling smoothField_gpu. This situation happens quite often when porting to GPUs for the first time.</p>
+
+<p>The next step in this codelab is to offload the resetF routine to the GPU, even though it does not take up a lot of time. We want to offload it to the GPU so that we can move the hipMemcpy calls outside of the iteration loop in main and reduce the number of times data is transmitted across the PCI bus.</p>
+
 
 
 
@@ -1061,9 +1203,155 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
     
 
-      <google-codelab-step label="Offload the resetFunction Kernel to the GPU" duration="10">
+      <google-codelab-step label="(Optional) Offload the resetF Kernel to the GPU" duration="10">
 
-        
+        <p>In this section, we are going to offload the <code>resetF</code> routine in <code>smoother.c</code> to the GPU so that we can migrate <code>hipMemcpy</code> calls outside of the iteration loop in <code>main.c</code>. By this point, you have worked through the mechanics for porting a routine to the GPU. Additionally, for this application, we already have all of the necessary data on the GPU that the <code>resetF</code> routine depends on.</p>
+
+<ol type="1" start="1">
+
+<li>Add <code>resetF_gpu</code> definition to <code>smoother.h</code></li>
+
+</ol>
+
+<pre><code>__global__ void resetF_gpu( real *f, real *smoothF, int nx, int ny, int buf );</code></pre>
+
+<ol type="1" start="2">
+
+<li>Add <code>resetF_gpu</code> to <code>smoother.c</code></li>
+
+</ol>
+
+<pre><code>__global__ void resetF_gpu( real *f, real *smoothF, int nx, int ny, int buf )
+
+{
+
+  size_t i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x + buf;
+
+  size_t j = hipThreadIdx_y + hipBlockIdx_y*hipBlockDim_y + buf;
+
+  int iel = i + nx*j;
+
+  if( i &gt;= buf &amp;&amp; i &lt; nX-buf &amp;&amp; j &gt;= buf &amp;&amp; j&lt; nY-buf){
+
+    f[iel] = smoothF[iel];
+
+  }
+
+}</code></pre>
+
+<ol type="1" start="3">
+
+<li>Replace <code>resetF</code> with <code>resetF_gpu</code> in <code>main.c</code>, move the <code>hipMemcpy</code> host-to-device calls before the iteration loop, and move the <code>hipMemcpy</code> device-to-host call after the iteration loop.</li>
+
+</ol>
+
+<pre><code>  hipMemcpy(f_dev, f, nElements*sizeof(real), hipMemcpyHostToDevice);
+
+
+
+  for( int iter=0; iter&lt;nIter; iter++){
+
+
+
+    // Run the smoother
+
+    hipLaunchKernelGGL((smoothField_gpu), dim3(gridDimX,gridDimY,1), dim3(threadsPerBlockX,threadsPerBlockY,1), 0, 0,
+
+                        smoothOperator.weights_dev, f_dev, smoothF_dev, nx, ny, smoothOperator.dim );
+
+
+
+    // Reassign smoothF to f
+
+    hipLaunchKernelGGL((resetF_gpu), dim3(gridDimX,gridDimY,1), dim3(threadsPerBlockX,threadsPerBlockY,1), 0, 0, f_dev, smoothF_dev, nx, ny, buf );
+
+  }
+
+  // Copy smoothF_dev from device to host
+
+  hipMemcpy(smoothF, smoothF_dev, nElements*sizeof(real), hipMemcpyDeviceToHost);</code></pre>
+
+<ol type="1" start="4">
+
+<li>Recompile the smoother2d application</li>
+
+</ol>
+
+<pre><code>$ make</code></pre>
+
+<ol type="1" start="5">
+
+<li>Verify that the solution output agrees with your reference output</li>
+
+</ol>
+
+<pre><code>$ ./smoother2d 1000 10
+
+$ diff function.txt reference/function.txt
+
+$ diff smooth-function.txt reference/smooth-function.txt</code></pre>
+
+<ol type="1" start="6">
+
+<li>You can verify that the the number of hipMemcpy calls is now reduced.</li>
+
+</ol>
+
+<ol type="1" start="1">
+
+<li>For AMD platforms, use <code>rocprof</code> with the <code>--hip-trace</code> flag. Running rocprof will create a file called <code>profile.json</code>. </li>
+
+<li>For Nvidia platforms, use <code>nvprof</code>. </li>
+
+</ol>
+
+<pre><code>$ nvprof ./smoother2d 1000 10
+
+==5017== NVPROF is profiling process 5017, command: ./smoother2d 1000 10
+
+==5017== Profiling application: ./smoother2d 1000 10
+
+==5017== Profiling result:
+
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+
+ GPU activities:   83.03%  9.3196ms        10  931.96us  931.14us  934.88us  smoothField_gpu(float*, float*, float*, int, int, int)
+
+                    7.37%  826.91us         3  275.64us  1.4400us  415.81us  [CUDA memcpy HtoD]
+
+                    5.91%  662.82us        10  66.281us  65.536us  67.616us  resetF_gpu(float*, float*, int, int, int)
+
+                    3.70%  415.27us         1  415.27us  415.27us  415.27us  [CUDA memcpy DtoH]
+
+      API calls:   93.01%  167.17ms         3  55.725ms  106.73us  166.94ms  cudaMalloc
+
+                    6.40%  11.511ms         4  2.8777ms  11.740us  10.515ms  cudaMemcpy
+
+                    0.27%  493.11us         3  164.37us  152.91us  180.26us  cudaFree
+
+                    0.11%  202.57us        97  2.0880us     204ns  83.892us  cuDeviceGetAttribute
+
+                    0.11%  197.07us         1  197.07us  197.07us  197.07us  cuDeviceTotalMem
+
+                    0.06%  111.06us        20  5.5530us  3.8360us  29.368us  cudaLaunchKernel
+
+                    0.02%  37.002us         1  37.002us  37.002us  37.002us  cuDeviceGetName
+
+                    0.00%  4.3920us         1  4.3920us  4.3920us  4.3920us  cuDeviceGetPCIBusId
+
+                    0.00%  2.0330us         3     677ns     237ns  1.4970us  cuDeviceGetCount
+
+                    0.00%     951ns         2     475ns     243ns     708ns  cuDeviceGet
+
+                    0.00%     393ns         1     393ns     393ns     393ns  cuDeviceGetUuid
+
+</code></pre>
+
+<aside class="special"><p><strong>Tip:</strong> Once you have verified your results, make sure that you commit your changes to your local git repository.</p>
+
+</aside>
+
+
 
 
 
@@ -1073,7 +1361,21 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
       <google-codelab-step label="Congratulations" duration="0">
 
-        <p>In this codelab, you</p>
+        <p>In this codelab, you learned how to port serial CPU-only routines in C to GPUs using HIP. To do this, you created device copies of CPU arrays and learned how to copy data from the CPU to the GPU and vice versa. You also learned how to write HIP kernels and launch them from the host. </p>
+
+<p>In the process of doing this, you practiced a strategy for porting to GPUs that included the following steps to make incremental changes to your own source code :</p>
+
+<ol type="1" start="1">
+
+<li>Profile - Find out the hotspots in your code and understand the dependencies with other routines</li>
+
+<li>Plan - Determine what routine you want to port, what data needs to be present on the GPU, and what data needs to be copied back to the CPU after execution</li>
+
+<li>Implement &amp; Verify - Create the necessary device data, insert the appropriate hipMemcpy calls, write an equivalent GPU kernel, and use hipLaunchKernelGGL to launch the GPU kernel. Run your application&#39;s tests and verify the results are correct. Check with a profiler that the new routine and the necessary hipMemCpy calls are being executed.</li>
+
+<li>Commit - Once you have verified correctness and the expected behavior, commit your changes and start the process over again.</li>
+
+</ol>
 
 <h2 is-upgraded><strong>Further reading</strong></h2>
 
@@ -1082,6 +1384,8 @@ $ diff smooth-function.txt reference.txt</code></pre>
 <li><a href="https://rocmdocs.amd.com/en/latest/Programming_Guides/HIP-GUIDE.html" target="_blank">HIP Programming Guide</a></li>
 
 <li><a href="https://rocm-developer-tools.github.io/HIP/" target="_blank">HIP API Documentation</a></li>
+
+<li><a href="https://docs.nvidia.com/cuda/floating-point/index.html#fused-multiply-add-fma" target="_blank">Fused Multiply-Add on Nvidia hardware</a></li>
 
 </ul>
 
