@@ -1,19 +1,18 @@
 
 CC=gcc
-OPT=-O0 -g
-LIB=-lm
-INC=
+CFLAGS=-O0 -g
+LFLAGS=-lm
 
 .PHONY: clean
 
 smoother2d: main.o smoother.o
-	${CC} ${OPT} *.o ${LIB} ${INC} -o $@
+	$(CCENV) $(CC) $(CFLAGS) *.o $(LFLAGS) -o $@
 
 main.o : main.c smoother.o
-	${CC} ${OPT} -c main.c ${LIB} ${INC} -o $@
+	$(CC) $(CFLAGS) -c main.c  -o $@
 
 smoother.o : smoother.c
-	${CC} ${OPT} -c smoother.c ${LIB} ${INC} -o $@
+	$(CC) $(CFLAGS) -c smoother.c  -o $@
 
 clean :
 	rm *.o smoother2d
