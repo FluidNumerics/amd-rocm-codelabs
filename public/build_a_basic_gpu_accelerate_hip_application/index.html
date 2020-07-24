@@ -129,7 +129,7 @@
 
 </td><td colspan="1" rowspan="1"><p>Directive</p>
 
-</td><td colspan="1" rowspan="1"><p>AOMP, GCC 10, XL</p>
+</td><td colspan="1" rowspan="1"><p>AOMP (Clang/Flang), GCC 10, XL</p>
 
 </td><td colspan="1" rowspan="1"><p>AMD, Nvidia</p>
 
@@ -345,7 +345,7 @@ $ source env/bin/activate</code></pre>
 
 </ol>
 
-<pre><code>OPT=-O2 -pg</code></pre>
+<pre><code>OPT=-O0 -g -pg</code></pre>
 
 <ol type="1" start="2">
 
@@ -1021,7 +1021,7 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
 <ol type="1" start="1">
 
-<li>Add a new routine, smoothField_gpu, to smoother.c. This routine needs to be of type __global__ so that it can be launched on the GPU (device) from the CPU (host) using hipLaunchKernelGGL.</li>
+<li>Add a new routine, <code>smoothField_gpu</code>, to <code>smoother.c</code>. This routine needs to be of type __global__ so that it can be launched on the GPU (device) from the CPU (host) using hipLaunchKernelGGL.</li>
 
 </ol>
 
@@ -1071,7 +1071,7 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
 <ol type="1" start="2">
 
-<li>Calculate the Block and Grid dimensions in main.c. You can place this block of code just before the iteration loop</li>
+<li>Calculate the Block and Grid dimensions in <code>main.c</code>. You can place this block of code just before the iteration loop</li>
 
 </ol>
 
@@ -1141,7 +1141,7 @@ $ diff smooth-function.txt reference/smooth-function.txt</code></pre>
 
 <ol type="1" start="1">
 
-<li>For AMD platforms, use <code>rocprof</code> with the <code>--hip-trace</code> flag. Running rocprof will create a file called <code>profile.json</code>. </li>
+<li>For AMD platforms, use <code>rocprof</code> with the <code>--hip-trace</code> and <code>--stats</code> flags. Running rocprof will create a file called <code>profile.json</code>. </li>
 
 <li>For Nvidia platforms, use <code>nvprof</code>. </li>
 
