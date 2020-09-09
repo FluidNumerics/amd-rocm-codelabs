@@ -8,11 +8,11 @@ LFLAGS=-lm
 smoother2d: main.o smoother.o
 	$(CCENV) $(CC) $(CFLAGS) *.o $(LFLAGS) -o $@
 
-main.o : main.c smoother.o
-	$(CC) $(CFLAGS) -c main.c  -o $@
+main.o : main.cpp smoother.o
+	$(CC) $(CFLAGS) -c main.cpp  -o $@
 
-smoother.o : smoother.c
-	$(CC) $(CFLAGS) -c smoother.c  -o $@
+smoother.o : smoother.cpp
+	$(CC) $(CFLAGS) -c smoother.cpp  -o $@
 
 clean :
 	rm *.o smoother2d

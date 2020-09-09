@@ -65,11 +65,11 @@ endif
 smoother2d: main.o smoother.o
 	$(CCENV) $(CC) $(CFLAGS) $(LFLAGS) *.o -o $@
 
-main.o : main.c smoother.o
-	$(CC) -c main.c $(CFLAGS) -o $@
+main.o : main.cpp smoother.o
+	$(CC) -c main.cpp $(CFLAGS) -o $@
 
-smoother.o : smoother.c
-	$(CC) -c smoother.c $(CFLAGS) -o $@
+smoother.o : smoother.cpp
+	$(CC) -c smoother.cpp $(CFLAGS) -o $@
 
 clean :
 	rm *.o smoother2d

@@ -1,5 +1,6 @@
 
 #include "precision.h"
+#include <hip/hip_runtime.h>
 
 typedef struct smoother{
   int dim;
