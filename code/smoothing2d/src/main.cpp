@@ -5,11 +5,6 @@
 #include "precision.h"
 #include "smoother.h"
 
-#ifndef pi
-#define pi 3.1415926535897932384626433832795
-#endif
-
-
 
 int main( int argc, char *argv[] )  {
   smoother smoothOperator;
@@ -53,7 +48,7 @@ int main( int argc, char *argv[] )  {
     for( int ix=0; ix<nx; ix++ ){
       x = (real)ix*dx;
       iel = ix + nx*iy;
-      f[iel] = sin(x*2.0*pi*10.0)*sin(y*2.0*pi*10.0);
+      f[iel] = tanh( (x-0.5)/0.01 )*tanh( (y-0.5)/0.01 );
       smoothF[iel] = 0.0;
     }
   } 

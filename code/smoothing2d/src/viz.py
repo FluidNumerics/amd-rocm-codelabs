@@ -22,8 +22,8 @@ fig, (ax1, ax2) = plt.subplots(nrows = 2, ncols=1)
 ax1.set_box_aspect(1)
 ax2.set_box_aspect(1)
 
-im = ax1.contourf(f,levels=np.arange(-1.0,1.0,0.1),cmap='seismic')
-im = ax2.contourf(smoothF,levels=np.arange(-1.0,1.0,0.1),cmap='seismic')
+im = ax1.contourf(f,levels=np.arange(-1.0,1.0,0.1),cmap='gray')
+im = ax2.contourf(smoothF,levels=np.arange(-1.0,1.0,0.1),cmap='gray')
 
 fig.subplots_adjust(right=0.5)
 cbar_ax = fig.add_axes([0.55, 0.125, 0.02, 0.75])
