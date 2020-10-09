@@ -69,11 +69,13 @@
 
       <google-codelab-step label="Introduction" duration="0">
 
-        <p><strong>Last Updated:</strong> 2020-23-07</p>
+        <p><strong>Last Updated:</strong> 2020-18-09</p>
 
 <p>Over the last few decades, there has been increased interest in using Graphics Processing Units (GPUs) to perform general purpose computing tasks. This practice is often referred to as General Purpose GPU (GPGPU) programming. Using GPUs for general purpose computing tasks gained attention primarily due to the inherent scale of parallelism within GPU hardware that enables faster computation and a reduction in the time-to-solution.</p>
 
 <p>Since GPUs were designed for handling graphics rendering tasks, implementing general purpose routines, like those for numerically solving partial differential equation or optimizing the weights in a neural network, was time-consuming and often error-prone. The continued interest and success of GPGPU computing led to the development of more user-friendly application programming interfaces (APIs) that allow developers to focus more attention on implementing algorithms using the syntax of compiled languages they are more familiar with, rather than thinking about how to express their algorithm in terms of graphics operations.</p>
+
+<p>Before diving into GPU programming APIs and how they can help you accelerate scientific applications, let&#39;s first discuss the basics of modern GPU accelerated compute platforms to help you better understand the software development problems they help solve.</p>
 
 <h2 is-upgraded><strong>Basics of GPU Accelerated Platforms</strong></h2>
 
@@ -81,9 +83,107 @@
 
 <p class="image-container"><img style="width: 348.50px" src="img/eb4f4a95fc0a22c0.png"></p>
 
-<p>On GPU-Accelerated High Performance Computing platforms, you will primarily encounter servers with one or more dedicated GPUs. Dedicated GPUs have an isolated set of compute cores and their own memory space, distinct from the CPU and the CPU&#39;s memory space. The figure above illustrates simple conceptual model of a server with a CPU connected to a single GPU that highlights these features. This conceptual model is purposefully simplified to highlight the first hurdle that all new GPU developers must overcome : managing CPU and GPU memory spaces.</p>
+<p>On GPU-Accelerated High Performance Computing platforms, you will primarily encounter servers with one or more dedicated GPUs. Dedicated GPUs have an isolated set of compute cores and their own memory space, distinct from the CPU and the CPU&#39;s memory space. The figure above illustrates simple conceptual model of a server with a CPU connected to a single GPU. This conceptual model is purposefully simplified to highlight the first hurdle that all new GPU developers must overcome : managing CPU and GPU memory spaces.</p>
+
+<p>On most modern GPU accelerated platforms, migrating data between the CPU and GPU can be a bottleneck. This is caused by limits in the PCI Bus peak bandwidth. Because of this, developers must be mindful to minimize the amount of data transfer between CPU and GPU for optimal performance.</p>
 
 <p>A more subtle aspect of GPU programming, driven by the fact that a GPU is a separate hardware component from the CPU, is the potential for asynchronous activities between the CPU and GPU. When developing a GPU accelerated application, kernels that can execute on the GPU are scheduled for execution by the CPU. Most modern GPU programming APIs provide calls that can force the issuing CPU process to stop and wait for the GPU kernel execution. Further, when a CPU issues multiple kernel execution instructions, these APIs can allow for serialized or asynchronous executions.</p>
+
+<h3 is-upgraded><strong>GPU Hardware</strong></h3>
+
+<p>GPUs for high performance computing are available from three different vendors : AMD, Nvidia, and Intel. Currently, each has their own terminology for describing the architecture and microarchitecture. We&#39;ll briefly describe a conceptual model of a GPU and relate terminology between vendors.<img style="width: 600.00px" src="img/c4854d064849fbc1.png"></p>
+
+<p>In general, GPUs are comprised of a number of compute units (AMD) or streaming multiprocessors (Nvidia), &#34;Global&#34; GPU RAM, and a Work Group Distributor (AMD) or Workload Manager (Nvidia). On Nvidia hardware, the Workload Manager schedules work to the streaming multiprocessors, which have a Same-Instruction-Multiple-Thread (SIMT) scheduler, Cache memory, registers, and a set of CUDA Cores. On AMD Hardware, the Work Group Distributor schedules work across the compute units, which each have a scheduler, local data share, L1 Cache, a mix of scalar and vector registers, and a Vector Arithmetic Logic Unit (ALU). </p>
+
+<p>GPU models are distinguished based on their microarchitecture and other characteristics, such as the number of compute units, PCI compatibility, memory and compute clock frequencies, and global memory size. For AMD GPUs, the microarchitecture refers to the architecture of the compute units.</p>
+
+<p>Below is a conceptual diagram of a single compute unit in AMD&#39;s Vega 20 micro-architecture. This micro-architecture is at the core of the Radeon Instinct MI50 &amp; MI60 GPUs and the <a href="https://www.amd.com/en/products/exascale-era%5C" target="_blank">Department of Energy&#39;s newest exascale systems</a>, <a href="https://www.llnl.gov/news/llnl-and-hpe-partner-amd-el-capitan-projected-worlds-fastest-supercomputer" target="_blank">El Capitan</a> and <a href="https://www.olcf.ornl.gov/frontier/" target="_blank">Frontier</a>. On AMD GPUs, each compute unit has 64 Vector ALU&#39;s.<img style="width: 624.00px" src="img/605439049bb81405.jpeg"></p>
+
+<p>The table below summarizes some of the characteristics of a few of the <a href="https://www.amd.com/en/graphics/servers-radeon-instinct-mi" target="_blank">latest lineup of AMD Radeon Instinct GPUs</a>. In this table, we are showing GPUs with varying microarchitecture, number of compute units, and global GPU memory size. The GPU&#39;s memory clock rate and compute clock rate, together with the type of memory and the number of Vector ALU&#39;s dictate the peak performance and memory bandwidth.</p>
+
+<table>
+
+<tr><td colspan="1" rowspan="1"><p><a href="https://www.amd.com/en/products/professional-graphics/instinct-mi50-32gb" target="_blank"><strong>MI50</strong></a></p>
+
+</td><td colspan="1" rowspan="1"><p><a href="https://www.amd.com/en/products/professional-graphics/instinct-mi25" target="_blank"><strong>MI25</strong></a></p>
+
+</td><td colspan="1" rowspan="1"><p><a href="https://www.amd.com/en/products/professional-graphics/instinct-mi8" target="_blank"><strong>MI8</strong></a></p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Microarchitecture</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>Vega20</p>
+
+</td><td colspan="1" rowspan="1"><p>Vega10</p>
+
+</td><td colspan="1" rowspan="1"><p>Fiji</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Compute Units</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>60</p>
+
+</td><td colspan="1" rowspan="1"><p>64</p>
+
+</td><td colspan="1" rowspan="1"><p>64</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Peak FP16 </strong></p>
+
+</td><td colspan="1" rowspan="1"><p>26.5 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>24.6 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>8.19 TFLOPS</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Peak FP32 </strong></p>
+
+</td><td colspan="1" rowspan="1"><p>13.3 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>12.29 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>8.19 TFLOPS</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Peak FP64 </strong></p>
+
+</td><td colspan="1" rowspan="1"><p>6.6 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>768 GFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>512 GFLOPS</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Memory Size</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>16-32 GB (HBM2)</p>
+
+</td><td colspan="1" rowspan="1"><p>16 GB (HBM2)</p>
+
+</td><td colspan="1" rowspan="1"><p>4 GB (HBM)</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Memory Bandwidth</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>1 TB/s</p>
+
+</td><td colspan="1" rowspan="1"><p>484 GB/s</p>
+
+</td><td colspan="1" rowspan="1"><p>512 GB/s</p>
+
+</td></tr>
+
+</table>
+
+<p>Now that you have some awareness of GPU hardware, let&#39;s talk about how we program GPUs to accelerate scientific applications.</p>
 
 <h2 is-upgraded><strong>GPU Programming APIs</strong></h2>
 
@@ -99,9 +199,9 @@
 
 <p>When programming with Directive-Based APIs, developers will provide &#34;hints&#34; to the compiler about how to offload sections of code to the GPU. In this approach, the compiler will then generate code for allocating/deallocating memory, copying memory between host and device, and how to parallelize sections of code. This method of GPU programming has the benefit of being able to start running on GPUs quickly with little effort. Additionally, management of CPU and GPU memory is handled &#34;behind-the-scenes&#34; by the compiler and can help limit code complexity. In this case, compilers will more often make decisions that ensure correctness, rather than optimize performance. Because of this, performance tuning often requires verbose compiler hints to limit superfluous data transfer between CPU and GPU and sometimes require alteration of the CPU code.</p>
 
-<p>When programming with Kernel-Based APIs, developers are solely responsible for creating and managing both CPU and GPU memory spaces. Additionally, they must write compute kernels that are consistent with their CPU counterparts and issue explicit calls to launch routines when needed. While this approach increases code complexity and has a higher barrier to entry than Directive-Based approaches, the developer has precise control over the performance of GPU kernels, separate from the counterpart CPU routines. Additionally, the developer can control precisely when data transfers between CPU and GPU occur, allowing for a clear path to minimize time spent crossing the PCI Bus.</p>
+<p>When programming with Kernel-Based APIs, developers are solely responsible for creating and managing both CPU and GPU memory spaces. Additionally, developers must write compute kernels that are consistent with their CPU counterparts and issue explicit calls to launch routines when needed. While this approach increases code complexity and has a higher barrier to entry than Directive-Based approaches, the developer has precise control over the performance of GPU kernels. Additionally, developers can control when data transfers between CPU and GPU occur, allowing for a clear path to minimize time spent crossing the PCI Bus.</p>
 
-<p>The table below provides a breakdown of popular GPU programming APIs, their type, which compilers expose the API, and which GPU platforms the API allows you to program for.  It&#39;s important to keep in mind that directive-based APIs yield varied performance across compilers. Further, Fortran compilers that are 2003 compliant are able to leverage ISO_C_BINDING to expose kernels that can be called from Fortran source code.</p>
+<p>The table below provides a breakdown of popular GPU programming APIs, their type, which compilers expose the API, and which GPU platforms the API allows you to program for.  It&#39;s important to keep in mind that directive-based APIs yield varied performance across compilers. Further, Fortran compilers that are 2003 compliant and above are able to leverage <a href="http://fortranwiki.org/fortran/show/iso_c_binding" target="_blank">ISO_C_BINDING</a> to expose C/C++ routines that can be called from Fortran source code, allowing C/C++ APIs to be made available in Fortran through C-interoperability.</p>
 
 <table>
 
@@ -115,17 +215,17 @@
 
 </td></tr>
 
-<tr><td colspan="1" rowspan="1"><p>HIP (HIP-Fortran)</p>
+<tr><td colspan="1" rowspan="1"><p><a href="https://github.com/ROCm-Developer-Tools/HIP" target="_blank">HIP</a> &amp; <a href="https://github.com/ROCmSoftwarePlatform/hipfort" target="_blank">hipfort</a></p>
 
 </td><td colspan="1" rowspan="1"><p>Kernel</p>
 
-</td><td colspan="1" rowspan="1"><p>hipcc</p>
+</td><td colspan="1" rowspan="1"><p>Hipcc (hcc/nvcc)</p>
 
 </td><td colspan="1" rowspan="1"><p>AMD, Nvidia</p>
 
 </td></tr>
 
-<tr><td colspan="1" rowspan="1"><p>OpenMP</p>
+<tr><td colspan="1" rowspan="1"><p><a href="https://www.openmp.org/specifications/" target="_blank">OpenMP (v5.0)</a></p>
 
 </td><td colspan="1" rowspan="1"><p>Directive</p>
 
@@ -165,7 +265,7 @@
 
 </td></tr>
 
-<tr><td colspan="1" rowspan="1"><p>OpenCL</p>
+<tr><td colspan="1" rowspan="1"><p><a href="https://www.khronos.org/opencl/" target="_blank">OpenCL</a></p>
 
 </td><td colspan="1" rowspan="1"><p>Kernel</p>
 
@@ -177,21 +277,49 @@
 
 </table>
 
+<h3 is-upgraded><strong>ROCm, HIP, and OpenMP : Portable, Open-Source Platforms for GPU Acceleration</strong></h3>
+
+<p>AMD, Nvidia, and Intel all design and manufacture GPUs for High Performance Computing. Currently, there is no unified machine code for GPUs that all vendors currently support on the hardware they produce. This has resulted in portability issues and the common &#34;vendor-lock&#34; problem, where HPC developers spend a significant amount of effort to port their application to a specific GPU and then lose the ability to easily transition to other hardware.</p>
+
+<p>As we have just shown, there are a number of APIs available that support GPGPU programming. Currently, this ecosystem is at a turning point where APIs are shifting towards meeting open-source and portability standards that enable developers to leverage GPU hardware from multiple vendors and even multi-core CPU platforms all with the same code. </p>
+
+<h4 is-upgraded>ROCm</h4>
+
+<p>AMD is currently leading this effort through its <a href="https://www.amd.com/en/graphics/servers-solutions-rocm" target="_blank">ROCm platform</a>. ROCm is AMD&#39;s open source platform for GPU accelerated computing that covers everything from the device driver and runtimes, to compilers, programming models and libraries. It also supports different frameworks and applications and comes with a complete set of developer tools for debugging and profiling your application to help you get the best possible performance.</p>
+
+<p>The diagram below summarizes the ROCm ecosystem that helps bridge the gap between HPC and Machine Learning applications and the variety of compute hardware targets, including GPUs.<img style="width: 624.00px" src="img/1a114e258c2c2c69.png"></p>
+
+<h4 is-upgraded>HIP</h4>
+
+<p>For Kernel-based GPU programming, ROCm includes the <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/HIP.html" target="_blank">Heterogeneous-Compute Interface for Portability (HIP)</a> and OpenCL. The Heterogeneous Interface for Portability (HIP) is AMD&#39;s dedicated GPU programming environment for designing high performance kernels on GPU hardware. AMD provides hipify tools that will convert CUDA to HIP, enhancing the performance portability of your GPU accelerated applications. The interface design of the API allows your new single source application to be compiled to target either AMD or NV hardware.</p>
+
+<p>HIP is a C++ dialect, similar to CUDA, that allows for programming and AMD and Nvidia GPUs. HIP maintainers have plans to support Intel (XE) GPUs in future releases. The latest version of the ROCm package, now includes <a href="https://github.com/ROCmSoftwarePlatform/hipfort" target="_blank">hipfort</a>, a Fortran interface that exposes the HIP API through ISO C Binding. <a href="https://rocmdocs.amd.com/en/latest/Programming_Guides/Opencl-programming-guide.html" target="_blank">OpenCL</a> is framework that is available through a C runtime API and is supported by AMD, Intel, and Nvidia GPUs and x86 CPUs. The ROCm platform provides an OpenCL runtime environment necessary for building portable, parallel applications that run on a variety of platforms.</p>
+
+<h4 is-upgraded>OpenMP 5.0</h4>
+
+<p>For Directive-based GPU programming, ROCm includes the <a href="https://github.com/ROCm-Developer-Tools/aomp" target="_blank">AOMP compilers</a> for C/C++ and Fortran. The AOMP compilers are an extension of the LLVM-based Clang and Flang compilers that support the OpenMP 5.0 standard for multi-core CPU and GPU programming on both AMD and Nvidia GPUs.</p>
+
+<h4 is-upgraded>GPU Accelerated Libraries</h4>
+
+<p>In addition to the programming APIs, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html" target="_blank">ROCm includes portable accelerated HPC and Machine Learning libraries</a>, such as  <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#rocblas" target="_blank">rocBLAS</a>, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#rocfft" target="_blank">rocFFT</a>, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#rocthrust" target="_blank">rocThrust</a>, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#hipsparse" target="_blank">rocSparse</a>, <a href="https://rocmdocs.amd.com/en/latest/Deep_learning/Deep-learning.html#tensorflow" target="_blank">Tensorflow</a>, <a href="https://rocmdocs.amd.com/en/latest/Deep_learning/Deep-learning.html#pytorch" target="_blank">PyTorch</a>, <a href="https://rocmdocs.amd.com/en/latest/Deep_learning/Deep-learning.html#miopen" target="_blank">MIOpen</a>, and many others. All of these tools are provided under open-source licensing and made freely available to help you accelerate your time-to-science in a community driven ecosystem. These libraries are beneficial when you want to quickly and optimally leverage GPUs, without having to write GPU kernels yourself.</p>
+
 <h2 is-upgraded><strong>What you will build</strong></h2>
 
-<p>In this codelab, you are going to transition a mini-application, written in C, from a CPU-only application to a portable GPU accelerated application, using OpenMP. </p>
+<p>In this codelab, we will focus on how to accelerate an application in C with OpenMP 5.0. You are going to work through transitioning a serial CPU-only mini-application to a portable GPU accelerated application, using OpenMP provided through the AOMP compilers. </p>
 
 <h2 is-upgraded><strong>What you will learn</strong></h2>
 
 <ul>
 
-<li>How to manage GPU memory with OpenMP</li>
+<li>How to develop a GPU porting strategy using application profiles and call graphs.</li>
 
-<li>How to offload regions of code to GPUs using OpenMP</li>
+<li>How to manage GPU memory with HIP.</li>
 
-<li>How to build GPU accelerated C/C++ applications for AMD and Nvidia platforms with a simple Makefile and the AOMP compiler</li>
+<li>How to launch GPU accelerated kernels with OpenMP.</li>
 
-<li>How to verify GPU memory allocation and kernel execution with the rocprof profiler</li>
+<li>How to build GPU accelerated C/C++ applications for AMD and Nvidia platforms with a simple Makefile.</li>
+
+<li>How to verify GPU memory allocation and kernel execution with the rocprof profiler.</li>
 
 </ul>
 
@@ -255,13 +383,13 @@
 
 <ol type="1" start="1">
 
-<li>smoother.c : Defines a simple data structure that stores the smoothing operators weights and the routines for allocating memory, deallocating memory, and executing the smoothing operation.</li>
+<li><code>smoother.cpp</code> : Defines a simple data structure that stores the smoothing operators weights and the routines for allocating memory, deallocating memory, and executing the smoothing operation.</li>
 
-<li>main.c : Defines the main program that sets up the 2-D field to be smoothed and managed file IO.</li>
+<li><code>main.cpp</code> : Defines the main program that sets up the 2-D field to be smoothed and managed file IO.</li>
 
-<li>makefile : A simple makefile is to build the application binary <code>smoother2d</code>.</li>
+<li><code>Makefile</code> : A simple makefile is to build the application binary <code>smoother2d</code>.</li>
 
-<li>viz.py : A python script for creating plots of the smoother2d output</li>
+<li><code>viz.py</code> : A python script for creating plots of the smoother2d output</li>
 
 </ol>
 
@@ -275,7 +403,7 @@
 
 </ol>
 
-<pre><code>$ git clone URL NEEDED</code></pre>
+<pre><code>$ git clone https://github.com/os-hackathon/amd-rocm-codelabs</code></pre>
 
 <ol type="1" start="2">
 
@@ -283,7 +411,7 @@
 
 </ol>
 
-<pre><code>$ cd amd-codelab-demos/smoothing2d/src
+<pre><code>$ cd amd-codelab-demos/code/smoothing2d/src
 
 $ make</code></pre>
 
@@ -293,7 +421,7 @@ $ make</code></pre>
 
 </ol>
 
-<p>$ ./smoother2d 1000 10</p>
+<p>$ ./smoother2d 1000 100</p>
 
 <h2 is-upgraded><strong>Visualize the output (Optional)</strong></h2>
 
@@ -325,7 +453,7 @@ $ source env/bin/activate</code></pre>
 
 <pre><code>(env)$ python3 ./viz.py</code></pre>
 
-<p>This script saves a figure to <code>function.eps</code>. This figure shows the initial 2-D function before smoothing on the top and the smoothed field on the bottom. An example of the visualized output from the <code>smoother2d</code> example program. The initial field is shown on the top, and the smoothed field is shown on the bottom after 10 iterations.<img style="width: 624.00px" src="img/339004e3869450ed.png"></p>
+<p>This script saves a figure to <code>function.eps</code>. This figure shows the initial 2-D function before smoothing on the top and the smoothed field on the bottom. An example of the visualized output from the <code>smoother2d</code> example program is shown in the image below for a grid with 100x100 cells. The initial field is shown on the top, and the smoothed field is shown on the bottom after 100 iterations. Increasing the number of iterations (the second argument) will enhance the amount of smoothing and will further blur the image.<img style="width: 624.00px" src="img/36a5cdd828d91bbd.png"></p>
 
 <h2 is-upgraded><strong>Profile the Application</strong></h2>
 
@@ -343,11 +471,11 @@ $ source env/bin/activate</code></pre>
 
 <ol type="1" start="1">
 
-<li>Add -pg flag to the OPT variable in the provided Makefile.</li>
+<li>Add -pg flag to the CFLAGS variable in the provided Makefile.</li>
 
 </ol>
 
-<pre><code>OPT=-O0 -g -pg</code></pre>
+<pre><code>CFLAGS=-O0 -g -pg</code></pre>
 
 <ol type="1" start="2">
 
@@ -533,7 +661,7 @@ CC = $(AOMP)/bin/clang</code></pre>
 
 </ol>
 
-<pre><code>INSTALLED_GPU  = $(shell $(AOMP)/bin/mygpu -d gfx900)# Default AOMP_GPU is gfx900 which is vega
+<pre><code>INSTALLED_GPU  = $(shell $(AOMP)/bin/mygpu -d gfx900)
 
 AOMP_GPU       ?= $(INSTALLED_GPU)
 
@@ -687,7 +815,7 @@ arrayOut = (float*)malloc( N*sizeof(float) );
 
 <p>Before the teams directive was introduced in OpenMP 4.0, parallelization was limited to parallelizing with a single group of threads. Since OpenMP 4.0, the teams directive can be used to express another dimension of parallelism that is appropriate for GPUs.</p>
 
-<p>The teams directive creates a &#34;league&#34; of teams that have, a single thread. Each team executes instructions concurrently. The parallel directive creates multiple threads within each team. The number of threads can be set with the optional num_threads clause after the parallel directive. On a GPU, the number of threads per team is ideally a multiple of the Wavefront/Warp size (64 or 32 threads).</p>
+<p>The teams directive creates a &#34;league&#34; of teams that have, by default, a single thread. Each team executes instructions concurrently. The parallel directive creates multiple threads within each team. The number of threads can be set with the optional <code>num_threads</code> clause after the parallel directive. On a GPU, the number of threads per team is ideally a multiple of the Wavefront/Warp size (64 or 32 threads).</p>
 
 <p>This example shows how to parallelize a for-loop with parallel teams, where each team has 256 threads.</p>
 
@@ -797,7 +925,7 @@ $ diff function.txt reference/function.txt
 
 $ diff smooth-function.txt reference/function.txt</code></pre>
 
-<h2 is-upgraded><strong>Offload resetF</strong></h2>
+<h2 is-upgraded>Offload resetF</h2>
 
 <ol type="1" start="1">
 
@@ -805,7 +933,7 @@ $ diff smooth-function.txt reference/function.txt</code></pre>
 
 </ol>
 
-<pre><code>  #pragma omp target map(to: smoothF[0:nX*nY]) map(f[0:nX*nY])</code></pre>
+<pre><code>  #pragma omp target map(to: smoothF[0:nx*ny]) map(f[0:nx*ny])</code></pre>
 
 <ol type="1" start="2">
 
@@ -813,17 +941,17 @@ $ diff smooth-function.txt reference/function.txt</code></pre>
 
 </ol>
 
-<pre><code>  #pragma omp target map(to: smoothF[0:nX*nY]) map(f[0:nX*nY])
+<pre><code>  #pragma omp target map(to: smoothF[0:nx*ny]) map(f[0:nx*ny])
 
   {
 
     #pragma omp teams distribute parallel for collapse(2) num_threads(256)
 
-    for( int iy=buf; iy&lt;nY-buf; iy++ ){
+    for( int iy=buf; iy&lt;ny-buf; iy++ ){
 
-      for( int ix=buf; ix&lt;nX-buf; ix++ ){
+      for( int ix=buf; ix&lt;nx-buf; ix++ ){
 
-        iel = ix + nX*iy;
+        iel = ix + nx*iy;
 
         f[iel] = smoothF[iel];
 
@@ -859,6 +987,22 @@ $ diff function.txt reference/function.txt
 
 $ diff smooth-function.txt reference/function.txt</code></pre>
 
+<ol type="1" start="5">
+
+<li>On AMD platforms, you can profile the application using the rocprof profiler. To profile OpenMP accelerated applications, you will need to set the flag --obj-tracking on. It is also helpful to enable the summary statistics using the --stats flag.</li>
+
+</ol>
+
+<pre><code>$ rocprof --obj-tracking on --stats ./smoother2d 1000 10
+
+$ cat results.stat.csv
+
+&#34;Name&#34;,&#34;Calls&#34;,&#34;TotalDurationNs&#34;,&#34;AverageNs&#34;,&#34;Percentage&#34;
+
+&#34;__omp_offloading_801_440b81_smoothField_l67.kd&#34;,10,30603997,3060399,78.4420113965
+
+&#34;__omp_offloading_801_440b81_resetF_l48.kd&#34;,10,8410807,841080,21.5579886035</code></pre>
+
 <h2 is-upgraded><strong>Next steps</strong></h2>
 
 <p>You&#39;ve successfully offloaded two routines to the GPU. However, you may have noticed that the runtime did not improve much, and may have even gotten worse, after you offloaded the second routine (<code>resetF</code>). At the start and end of each target region, the application is copying data between the CPU and GPU. Ideally, you want to minimize data movement between the host and device. </p>
@@ -873,7 +1017,7 @@ $ diff smooth-function.txt reference/function.txt</code></pre>
 
     
 
-      <google-codelab-step label="Migrating  &amp; Merging Data Regions" duration="15">
+      <google-codelab-step label="Using Unstructured Data Directives" duration="15">
 
         <p>In this section you will learn how to use unstructured data directives with OpenMP to control when data is copied to and from the GPU. </p>
 
@@ -971,7 +1115,7 @@ free(arrayOut);</code></pre>
 
 </ol>
 
-<pre><code>  #pragma omp target update to(f[0:nElements], smoothF[0:nElements], smoothOperator.weights[0:N*N])
+<pre><code>  #pragma omp target update to(f[0:nElements], smoothF[0:nElements])
 
   for( int iter=0; iter&lt;nIter; iter++){
 

@@ -3,7 +3,7 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2020-07-24T23:47:40Z",
+  "updated": "2020-09-17T19:33:55Z",
   "id": "URL",
   "duration": 65,
   "title": "Building a basic GPU accelerated application with OpenMP in C/C++",

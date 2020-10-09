@@ -3,7 +3,7 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2020-07-24T18:08:52Z",
+  "updated": "2020-09-16T23:27:21Z",
   "id": "URL",
   "duration": 75,
   "title": "Building a basic GPU accelerated application with HIP in C/C++",
