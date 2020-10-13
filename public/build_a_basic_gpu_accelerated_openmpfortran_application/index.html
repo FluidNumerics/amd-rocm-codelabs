@@ -993,13 +993,7 @@ $ diff smooth-function.txt reference/function.txt</code></pre>
 
 </ol>
 
-<pre><code>$ time ./smoother 1000 10
-
-real        0m2.970s
-
-user        0m1.528s
-
-sys        0m1.228s
+<pre><code>$./smoother 1000 10
 
 $ diff function.txt reference/function.txt
 
@@ -1151,11 +1145,17 @@ DEALLOCATE(arrayIn, arrayOut)</code></pre>
 
 <ol type="1" start="4">
 
-<li>Re-compile the <code>smoother</code> application.</li>
+<li>Re-compile the <code>smoother</code> application.Run the <code>smoother</code> application with the same input parameters as before and compare the output with the reference output. You can use the diff command line tool to compare the new output with the reference output. If the files are identical, no output will be printed to screen.</li>
 
 </ol>
 
-<pre><code>$ make</code></pre>
+<pre><code>$ make
+
+$./smoother 1000 10
+
+$ diff function.txt reference/function.txt
+
+$ diff smooth-function.txt reference/function.txt</code></pre>
 
 <ol type="1" start="5">
 
