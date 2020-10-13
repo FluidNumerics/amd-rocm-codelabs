@@ -605,7 +605,7 @@ $ source env/bin/activate</code></pre>
 
 </aside>
 
-<p>In the <code>smoother2d</code> application, we have seen that the <code>smoothField</code> routine, called by <code>main</code>, takes up the most time. Looking at the function call in <code>main.c</code> and the <code>smoothField</code> routine in <code>smoother.c</code>, we see that this routine takes in a <code>smoother</code> object, a real array pointer <code>f</code>, and integers <code>nx</code> and <code>ny</code> that are passed by value.</p>
+<p>In the <code>smoother2d</code> application, we have seen that the <code>smoothField</code> routine, called by <code>main</code>, takes up the most time. Looking at the function call in <code>main.cpp</code> and the <code>smoothField</code> routine in <code>smoother.cpp</code>, we see that this routine takes in a <code>smoother</code> object, a real array pointer <code>f</code>, and integers <code>nx</code> and <code>ny</code> that are passed by value.</p>
 
 <pre><code> 81   for( int iter=0; iter&lt;nIter; iter++){
 
@@ -795,13 +795,13 @@ hipFree,3,152335,50778,1.16784331343</code></pre>
 
 </ol>
 
-<pre><code>$ git add smoother.h smoother.c makefile &amp;&amp; git commit</code></pre>
+<pre><code>$ git add smoother.h smoother.cpp makefile &amp;&amp; git commit</code></pre>
 
 <h2 is-upgraded><strong>Copy f and smoothF to the GPU</strong></h2>
 
 <ol type="1" start="1">
 
-<li>Include the hip runtime header at the top of <code>main.c</code> so that you can make HIP API calls.</li>
+<li>Include the hip runtime header at the top of <code>main.cpp</code> so that you can make HIP API calls.</li>
 
 </ol>
 
@@ -819,7 +819,7 @@ hipFree,3,152335,50778,1.16784331343</code></pre>
 
 <ol type="1" start="2">
 
-<li>Declare real pointers for f and smoothF in main.c</li>
+<li>Declare real pointers for f and smoothF in main.cpp</li>
 
 </ol>
 
@@ -1155,7 +1155,7 @@ hipFree,3,173225,57741,0.393127872872</code></pre>
 
 <ol type="1" start="1">
 
-<li>Add a new routine, <code>smoothField_gpu</code>, to <code>smoother.c</code>. This routine needs to be of type __global__ so that it can be launched on the GPU (device) from the CPU (host) using hipLaunchKernelGGL.</li>
+<li>Add a new routine, <code>smoothField_gpu</code>, to <code>smoother.cpp</code>. This routine needs to be of type __global__ so that it can be launched on the GPU (device) from the CPU (host) using hipLaunchKernelGGL.</li>
 
 </ol>
 
@@ -1205,7 +1205,7 @@ hipFree,3,173225,57741,0.393127872872</code></pre>
 
 <ol type="1" start="2">
 
-<li>Calculate the Block and Grid dimensions in <code>main.c</code>. You can place this block of code just before the iteration loop</li>
+<li>Calculate the Block and Grid dimensions in <code>main.cpp</code>. You can place this block of code just before the iteration loop</li>
 
 </ol>
 
@@ -1221,7 +1221,7 @@ hipFree,3,173225,57741,0.393127872872</code></pre>
 
 <ol type="1" start="3">
 
-<li>Replace the smoothField call in main.c with a kernel launch call for smoothField_gpu</li>
+<li>Replace the smoothField call in main.cpp with a kernel launch call for smoothField_gpu</li>
 
 </ol>
 
@@ -1367,7 +1367,7 @@ hipFree,3,300215,100071,0.0872907081227</code></pre>
 
       <google-codelab-step label="(Optional) Offload the resetF Kernel to the GPU" duration="10">
 
-        <p>In this section, we are going to offload the <code>resetF</code> routine in <code>smoother.c</code> to the GPU so that we can migrate <code>hipMemcpy</code> calls outside of the iteration loop in <code>main.c</code>. By this point, you have worked through the mechanics for porting a routine to the GPU. Additionally, for this application, we already have all of the necessary data on the GPU that the <code>resetF</code> routine depends on.</p>
+        <p>In this section, we are going to offload the <code>resetF</code> routine in <code>smoother.cpp</code> to the GPU so that we can migrate <code>hipMemcpy</code> calls outside of the iteration loop in <code>main.cpp</code>. By this point, you have worked through the mechanics for porting a routine to the GPU. Additionally, for this application, we already have all of the necessary data on the GPU that the <code>resetF</code> routine depends on.</p>
 
 <ol type="1" start="1">
 
@@ -1379,7 +1379,7 @@ hipFree,3,300215,100071,0.0872907081227</code></pre>
 
 <ol type="1" start="2">
 
-<li>Add <code>resetF_gpu</code> to <code>smoother.c</code></li>
+<li>Add <code>resetF_gpu</code> to <code>smoother.cpp</code></li>
 
 </ol>
 
@@ -1403,7 +1403,7 @@ hipFree,3,300215,100071,0.0872907081227</code></pre>
 
 <ol type="1" start="3">
 
-<li>Replace <code>resetF</code> with <code>resetF_gpu</code> in <code>main.c</code>, move the <code>hipMemcpy</code> host-to-device calls before the iteration loop, and move the <code>hipMemcpy</code> device-to-host call after the iteration loop.</li>
+<li>Replace <code>resetF</code> with <code>resetF_gpu</code> in <code>main.cpp</code>, move the <code>hipMemcpy</code> host-to-device calls before the iteration loop, and move the <code>hipMemcpy</code> device-to-host call after the iteration loop.</li>
 
 </ol>
 

@@ -18,6 +18,15 @@
      "description":"This codelab will walk you through the basics of CPU and GPU memory management and GPU kernel launching with OpenMP in C/C++ for both AMD and Nvidia GPUs.",
      "codes":["./smoothing2d/"],
      "subdirectory":"build_a_basic_gpu_accelerate_openmp_application"
+    },
+    {
+     "title":"Building a basic GPU accelerated application with HIP in Fortran",
+     "gdoc_id":"1Iy-qrSqMFH-SFhwkFcd_SDzXbajunm3lozHTs2nc9RA",
+     "author":"Joseph Schoonover",
+     "author_affiliation": "Fluid Numerics LLC",
+     "description":"This codelab will walk you through the basics of CPU and GPU memory management and GPU kernel launching with HIP/hipfort in Fortran.",
+     "codes":["./smoother_fortran/"],
+     "subdirectory":"build_a_basic_gpu_accelerated_hipfort_application"
     }
   ]
 }

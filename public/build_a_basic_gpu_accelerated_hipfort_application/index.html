@@ -1,0 +1,1675 @@
+
+
+<!doctype html>
+
+
+
+<html>
+
+<head>
+
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+
+  <meta name="theme-color" content="#4F7DC9">
+
+  <meta charset="UTF-8">
+
+  <title>Building a basic GPU accelerated application with HIP in Fortran</title>
+
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+
+  <style>
+
+    .success {
+
+      color: #1e8e3e;
+
+    }
+
+    .error {
+
+      color: red;
+
+    }
+
+  </style>
+
+
+<!-- update the version number as needed -->
+<script defer src="/__/firebase/7.9.3/firebase-app.js"></script>
+<!-- include only the Firebase features as you need -->
+<script defer src="/__/firebase/7.9.3/firebase-auth.js"></script>
+<script defer src="/__/firebase/7.9.3/firebase-database.js"></script>
+<script defer src="/__/firebase/7.9.3/firebase-messaging.js"></script>
+<script defer src="/__/firebase/7.9.3/firebase-storage.js"></script>
+<!-- initialize the SDK after all desired features are loaded -->
+<script defer src="/__/firebase/init.js"></script>
+
+</head>
+
+<body>
+
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+
+  <google-codelab codelab-gaid="TO DO"
+
+                  id="URL"
+
+                  title="Building a basic GPU accelerated application with HIP in Fortran"
+
+                  environment="web"
+
+                  feedback-link="TO DO">
+
+    
+
+      <google-codelab-step label="Introduction" duration="0">
+
+        <p><strong>Last Updated:</strong> 2020-12-10</p>
+
+<p>Over the last few decades, there has been increased interest in using Graphics Processing Units (GPUs) to perform general purpose computing tasks. This practice is often referred to as General Purpose GPU (GPGPU) programming. Using GPUs for general purpose computing tasks gained attention primarily due to the inherent scale of parallelism within GPU hardware that enables faster computation and a reduction in the time-to-solution.</p>
+
+<p>Since GPUs were designed for handling graphics rendering tasks, implementing general purpose routines, like those for numerically solving partial differential equation or optimizing the weights in a neural network, was time-consuming and often error-prone. The continued interest and success of GPGPU computing led to the development of more user-friendly application programming interfaces (APIs) that allow developers to focus more attention on implementing algorithms using the syntax of compiled languages they are more familiar with, rather than thinking about how to express their algorithm in terms of graphics operations.</p>
+
+<p>Before diving into GPU programming APIs and how they can help you accelerate scientific applications, let&#39;s first discuss the basics of modern GPU accelerated compute platforms to help you better understand the software development problems they help solve.</p>
+
+<h2 is-upgraded><strong>Basics of GPU Accelerated Platforms</strong></h2>
+
+<p>A GPU is an additional hardware component that can perform operations alongside a CPU. GPUs are either integrated into the motherboard or silicon dye alongside a CPU, or are made available through a dedicated interconnect, called the Peripheral Component Interconnect (PCI). The PCI is a physical hardware component that allows data to be transmitted between the CPU and GPU.</p>
+
+<p class="image-container"><img style="width: 348.50px" src="img/eb4f4a95fc0a22c0.png"></p>
+
+<p>On GPU-Accelerated High Performance Computing platforms, you will primarily encounter servers with one or more dedicated GPUs. Dedicated GPUs have an isolated set of compute cores and their own memory space, distinct from the CPU and the CPU&#39;s memory space. The figure above illustrates simple conceptual model of a server with a CPU connected to a single GPU. This conceptual model is purposefully simplified to highlight the first hurdle that all new GPU developers must overcome : managing CPU and GPU memory spaces.</p>
+
+<p>On most modern GPU accelerated platforms, migrating data between the CPU and GPU can be a bottleneck. This is caused by limits in the PCI Bus peak bandwidth. Because of this, developers must be mindful to minimize the amount of data transfer between CPU and GPU for optimal performance.</p>
+
+<p>A more subtle aspect of GPU programming, driven by the fact that a GPU is a separate hardware component from the CPU, is the potential for asynchronous activities between the CPU and GPU. When developing a GPU accelerated application, kernels that can execute on the GPU are scheduled for execution by the CPU. Most modern GPU programming APIs provide calls that can force the issuing CPU process to stop and wait for the GPU kernel execution. Further, when a CPU issues multiple kernel execution instructions, these APIs can allow for serialized or asynchronous executions.</p>
+
+<h3 is-upgraded>GPU Hardware</h3>
+
+<p>GPUs for high performance computing are available from three different vendors : AMD, Nvidia, and Intel. Currently, each has their own terminology for describing the architecture and microarchitecture. We&#39;ll briefly describe a conceptual model of a GPU and relate terminology between vendors.<img style="width: 600.00px" src="img/c4854d064849fbc1.png"></p>
+
+<p>In general, GPUs are comprised of a number of compute units (AMD) or streaming multiprocessors (Nvidia), &#34;Global&#34; GPU RAM, and a Work Group Distributor (AMD) or Workload Manager (Nvidia). On Nvidia hardware, the Workload Manager schedules work to the streaming multiprocessors, which have a Same-Instruction-Multiple-Thread (SIMT) scheduler, Cache memory, registers, and a set of CUDA Cores. On AMD Hardware, the Work Group Distributor schedules work across the compute units, which each have a scheduler, local data share, L1 Cache, a mix of scalar and vector registers, and a Vector Arithmetic Logic Unit (ALU). </p>
+
+<p>GPU models are distinguished based on their microarchitecture and other characteristics, such as the number of compute units, PCI compatibility, memory and compute clock frequencies, and global memory size. For AMD GPUs, the microarchitecture refers to the architecture of the compute units.</p>
+
+<p>Below is a conceptual diagram of a single compute unit in AMD&#39;s Vega 20 micro-architecture. This micro-architecture is at the core of the Radeon Instinct MI50 &amp; MI60 GPUs and the <a href="https://www.amd.com/en/products/exascale-era%5C" target="_blank">Department of Energy&#39;s newest exascale systems</a>, <a href="https://www.llnl.gov/news/llnl-and-hpe-partner-amd-el-capitan-projected-worlds-fastest-supercomputer" target="_blank">El Capitan</a> and <a href="https://www.olcf.ornl.gov/frontier/" target="_blank">Frontier</a>. On AMD GPUs, each compute unit has 64 Vector ALU&#39;s.<img style="width: 624.00px" src="img/605439049bb81405.jpeg"></p>
+
+<p>The table below summarizes some of the characteristics of a few of the <a href="https://www.amd.com/en/graphics/servers-radeon-instinct-mi" target="_blank">latest lineup of AMD Radeon Instinct GPUs</a>. In this table, we are showing GPUs with varying microarchitecture, number of compute units, and global GPU memory size. The GPU&#39;s memory clock rate and compute clock rate, together with the type of memory and the number of Vector ALU&#39;s dictate the peak performance and memory bandwidth.</p>
+
+<table>
+
+<tr><td colspan="1" rowspan="1"><p><a href="https://www.amd.com/en/products/professional-graphics/instinct-mi50-32gb" target="_blank"><strong>MI50</strong></a></p>
+
+</td><td colspan="1" rowspan="1"><p><a href="https://www.amd.com/en/products/professional-graphics/instinct-mi25" target="_blank"><strong>MI25</strong></a></p>
+
+</td><td colspan="1" rowspan="1"><p><a href="https://www.amd.com/en/products/professional-graphics/instinct-mi8" target="_blank"><strong>MI8</strong></a></p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Microarchitecture</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>Vega20</p>
+
+</td><td colspan="1" rowspan="1"><p>Vega10</p>
+
+</td><td colspan="1" rowspan="1"><p>Fiji</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Compute Units</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>60</p>
+
+</td><td colspan="1" rowspan="1"><p>64</p>
+
+</td><td colspan="1" rowspan="1"><p>64</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Peak FP16 </strong></p>
+
+</td><td colspan="1" rowspan="1"><p>26.5 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>24.6 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>8.19 TFLOPS</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Peak FP32 </strong></p>
+
+</td><td colspan="1" rowspan="1"><p>13.3 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>12.29 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>8.19 TFLOPS</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Peak FP64 </strong></p>
+
+</td><td colspan="1" rowspan="1"><p>6.6 TFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>768 GFLOPS</p>
+
+</td><td colspan="1" rowspan="1"><p>512 GFLOPS</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Memory Size</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>16-32 GB (HBM2)</p>
+
+</td><td colspan="1" rowspan="1"><p>16 GB (HBM2)</p>
+
+</td><td colspan="1" rowspan="1"><p>4 GB (HBM)</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Memory Bandwidth</strong></p>
+
+</td><td colspan="1" rowspan="1"><p>1 TB/s</p>
+
+</td><td colspan="1" rowspan="1"><p>484 GB/s</p>
+
+</td><td colspan="1" rowspan="1"><p>512 GB/s</p>
+
+</td></tr>
+
+</table>
+
+<p>Now that you have some awareness of GPU hardware, let&#39;s talk about how we program GPUs to accelerate scientific applications.</p>
+
+<h2 is-upgraded><strong>GPU Programming APIs</strong></h2>
+
+<p>In general, a GPU programming API must provide routines that developers can leverage to allocate and deallocate memory on the GPU, copy memory between the CPU and GPU, and control kernel execution. GPU programming APIs can be classified into two categories</p>
+
+<ol type="1" start="1">
+
+<li>Directive-Based</li>
+
+<li>Kernel-Based</li>
+
+</ol>
+
+<p>When programming with Directive-Based APIs, developers will provide &#34;hints&#34; to the compiler about how to offload sections of code to the GPU. In this approach, the compiler will then generate code for allocating/deallocating memory, copying memory between host and device, and how to parallelize sections of code. This method of GPU programming has the benefit of being able to start running on GPUs quickly with little effort. Additionally, management of CPU and GPU memory is handled &#34;behind-the-scenes&#34; by the compiler and can help limit code complexity. In this case, compilers will more often make decisions that ensure correctness, rather than optimize performance. Because of this, performance tuning often requires verbose compiler hints to limit superfluous data transfer between CPU and GPU and sometimes require alteration of the CPU code.</p>
+
+<p>When programming with Kernel-Based APIs, developers are solely responsible for creating and managing both CPU and GPU memory spaces. Additionally, developers must write compute kernels that are consistent with their CPU counterparts and issue explicit calls to launch routines when needed. While this approach increases code complexity and has a higher barrier to entry than Directive-Based approaches, the developer has precise control over the performance of GPU kernels. Additionally, developers can control when data transfers between CPU and GPU occur, allowing for a clear path to minimize time spent crossing the PCI Bus.</p>
+
+<p>The table below provides a breakdown of popular GPU programming APIs, their type, which compilers expose the API, and which GPU platforms the API allows you to program for.  It&#39;s important to keep in mind that directive-based APIs yield varied performance across compilers. Further, Fortran compilers that are 2003 compliant and above are able to leverage <a href="http://fortranwiki.org/fortran/show/iso_c_binding" target="_blank">ISO_C_BINDING</a> to expose C/C++ routines that can be called from Fortran source code, allowing C/C++ APIs to be made available in Fortran through C-interoperability.</p>
+
+<table>
+
+<tr><td colspan="1" rowspan="1"><p><strong>API </strong></p>
+
+</td><td colspan="1" rowspan="1"><p><strong>Type</strong></p>
+
+</td><td colspan="1" rowspan="1"><p><strong>Compiler Support</strong></p>
+
+</td><td colspan="1" rowspan="1"><p><strong>Platforms</strong></p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><a href="https://github.com/ROCm-Developer-Tools/HIP" target="_blank">HIP</a> &amp; <a href="https://github.com/ROCmSoftwarePlatform/hipfort" target="_blank">hipfort</a></p>
+
+</td><td colspan="1" rowspan="1"><p>Kernel</p>
+
+</td><td colspan="1" rowspan="1"><p>Hipcc (hcc/nvcc)</p>
+
+</td><td colspan="1" rowspan="1"><p>AMD, Nvidia</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><a href="https://www.openmp.org/specifications/" target="_blank">OpenMP (v5.0)</a></p>
+
+</td><td colspan="1" rowspan="1"><p>Directive</p>
+
+</td><td colspan="1" rowspan="1"><p>AOMP (Clang/Flang), GCC 10, XL</p>
+
+</td><td colspan="1" rowspan="1"><p>AMD, Nvidia</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>CUDA</p>
+
+</td><td colspan="1" rowspan="1"><p>Kernel</p>
+
+</td><td colspan="1" rowspan="1"><p>nvcc</p>
+
+</td><td colspan="1" rowspan="1"><p>Nvidia</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>CUDA-Fortran</p>
+
+</td><td colspan="1" rowspan="1"><p>Kernel</p>
+
+</td><td colspan="1" rowspan="1"><p>PGI</p>
+
+</td><td colspan="1" rowspan="1"><p>Nvidia</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>OpenACC</p>
+
+</td><td colspan="1" rowspan="1"><p>Directive</p>
+
+</td><td colspan="1" rowspan="1"><p>GCC 9, PGI, XL</p>
+
+</td><td colspan="1" rowspan="1"><p>Nvidia</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p><a href="https://www.khronos.org/opencl/" target="_blank">OpenCL</a></p>
+
+</td><td colspan="1" rowspan="1"><p>Kernel</p>
+
+</td><td colspan="1" rowspan="1"><p>All</p>
+
+</td><td colspan="1" rowspan="1"><p>All</p>
+
+</td></tr>
+
+</table>
+
+<h3 is-upgraded><strong>ROCm, HIP, and OpenMP : Portable, Open-Source Platforms for GPU Acceleration</strong></h3>
+
+<p>AMD, Nvidia, and Intel all design and manufacture GPUs for High Performance Computing. Currently, there is no unified machine code for GPUs that all vendors currently support on the hardware they produce. This has resulted in portability issues and the common &#34;vendor-lock&#34; problem, where HPC developers spend a significant amount of effort to port their application to a specific GPU and then lose the ability to easily transition to other hardware.</p>
+
+<p>As we have just shown, there are a number of APIs available that support GPGPU programming. Currently, this ecosystem is at a turning point where APIs are shifting towards meeting open-source and portability standards that enable developers to leverage GPU hardware from multiple vendors and even multi-core CPU platforms all with the same code. </p>
+
+<h4 is-upgraded>ROCm</h4>
+
+<p>AMD is currently leading this effort through its <a href="https://www.amd.com/en/graphics/servers-solutions-rocm" target="_blank">ROCm platform</a>. ROCm is AMD&#39;s open source platform for GPU accelerated computing that covers everything from the device driver and runtimes, to compilers, programming models and libraries. It also supports different frameworks and applications and comes with a complete set of developer tools for debugging and profiling your application to help you get the best possible performance.</p>
+
+<p>The diagram below summarizes the ROCm ecosystem that helps bridge the gap between HPC and Machine Learning applications and the variety of compute hardware targets, including GPUs.<img style="width: 624.00px" src="img/1a114e258c2c2c69.png"></p>
+
+<h4 is-upgraded>HIP</h4>
+
+<p>For Kernel-based GPU programming, ROCm includes the <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/HIP.html" target="_blank">Heterogeneous-Compute Interface for Portability (HIP)</a> and OpenCL. The Heterogeneous Interface for Portability (HIP) is AMD&#39;s dedicated GPU programming environment for designing high performance kernels on GPU hardware. AMD provides hipify tools that will convert CUDA to HIP, enhancing the performance portability of your GPU accelerated applications. The interface design of the API allows your new single source application to be compiled to target either AMD or NV hardware.</p>
+
+<p>HIP is a C++ dialect, similar to CUDA, that allows for programming and AMD and Nvidia GPUs. HIP maintainers have plans to support Intel (XE) GPUs in future releases. The latest version of the ROCm package, now includes <a href="https://github.com/ROCmSoftwarePlatform/hipfort" target="_blank">hipfort</a>, a Fortran interface that exposes the HIP API through ISO C Binding. <a href="https://rocmdocs.amd.com/en/latest/Programming_Guides/Opencl-programming-guide.html" target="_blank">OpenCL</a> is framework that is available through a C runtime API and is supported by AMD, Intel, and Nvidia GPUs and x86 CPUs. The ROCm platform provides an OpenCL runtime environment necessary for building portable, parallel applications that run on a variety of platforms.</p>
+
+<h4 is-upgraded>OpenMP 5.0</h4>
+
+<p>For Directive-based GPU programming, ROCm includes the <a href="https://github.com/ROCm-Developer-Tools/aomp" target="_blank">AOMP compilers</a> for C/C++ and Fortran. The AOMP compilers are an extension of the LLVM-based Clang and Flang compilers that support the OpenMP 5.0 standard for multi-core CPU and GPU programming on both AMD and Nvidia GPUs.</p>
+
+<h4 is-upgraded>GPU Accelerated Libraries</h4>
+
+<p>In addition to the programming APIs, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html" target="_blank">ROCm includes portable accelerated HPC and Machine Learning libraries</a>, such as  <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#rocblas" target="_blank">rocBLAS</a>, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#rocfft" target="_blank">rocFFT</a>, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#rocthrust" target="_blank">rocThrust</a>, <a href="https://rocmdocs.amd.com/en/latest/ROCm_Libraries/ROCm_Libraries.html#hipsparse" target="_blank">rocSparse</a>, <a href="https://rocmdocs.amd.com/en/latest/Deep_learning/Deep-learning.html#tensorflow" target="_blank">Tensorflow</a>, <a href="https://rocmdocs.amd.com/en/latest/Deep_learning/Deep-learning.html#pytorch" target="_blank">PyTorch</a>, <a href="https://rocmdocs.amd.com/en/latest/Deep_learning/Deep-learning.html#miopen" target="_blank">MIOpen</a>, and many others. All of these tools are provided under open-source licensing and made freely available to help you accelerate your time-to-science in a community driven ecosystem. These libraries are beneficial when you want to quickly and optimally leverage GPUs, without having to write GPU kernels yourself.</p>
+
+<h2 is-upgraded><strong>What you will build</strong></h2>
+
+<p>In this codelab, we will focus on how to accelerate an application in Fortran with HIP. You are going to work through transitioning a serial CPU-only mini-application to a portable GPU accelerated application, using AMD&#39;s HIP. </p>
+
+<h2 is-upgraded><strong>What you will learn</strong></h2>
+
+<ul>
+
+<li>How to develop a GPU porting strategy using application profiles and call graphs.</li>
+
+<li>How to manage GPU memory with hipfort.</li>
+
+<li>How to launch GPU accelerated kernels with hipfort.</li>
+
+<li>How to build GPU accelerated C/C++ applications for AMD and Nvidia platforms with a simple Makefile.</li>
+
+<li>How to verify GPU memory allocation and kernel execution with the rocprof profiler.</li>
+
+</ul>
+
+<h2 is-upgraded><strong>What you will need</strong></h2>
+
+<ul>
+
+<li>A compute platform with AMD or Nvidia GPU(s)</li>
+
+<li>Linux operating system (e.g. Debian, Ubuntu, CentOS, or RHEL)</li>
+
+<li>Working installation of <a href="https://rocm-documentation.readthedocs.io/en/latest/Installation_Guide/Installation-Guide.html" target="_blank">ROCm-dev</a> ( v3.8 or greater )</li>
+
+<li>Working installation of <a href="https://github.com/ROCmSoftwarePlatform/hipfort" target="_blank">hipfort</a> </li>
+
+<li>Basic Command-Line Linux Experience</li>
+
+<li>Working C or C++ compiler</li>
+
+</ul>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Clone and Run the Demo Application (CPU-Only)" duration="15">
+
+        <p>In this section, we introduce the demo application and walk through building and verifying the example. It&#39;s important to make sure that the code produces the expected result as we will be using the CPU generated model output to ensure that the solution does not change when we port to the GPU. </p>
+
+<aside class="special"><p><strong>Tip:</strong> In practice, it&#39;s ideal to define tests for all of your routines as standalone (unit-tests) and/or in concert together (integration-tests). These tests would ideally be run regularly during development and with every commit to your code&#39;s repository.</p>
+
+</aside>
+
+<p>This application executes a 2-D smoothing operation on a square grid of points. The program proceeds as follows</p>
+
+<ol type="1" start="1">
+
+<li>Process command line arguments</li>
+
+<li>Allocate memory for smoother class - 5x5 stencil with Gaussian weights</li>
+
+<li>Allocate memory for function and smoothed function</li>
+
+<li>Initialize function on CPU and report function to file</li>
+
+<li>Call smoothing function</li>
+
+<li>Report smoothed function to file</li>
+
+<li>Clear memory</li>
+
+</ol>
+
+<h2 is-upgraded><strong>Code Structure</strong></h2>
+
+<p>This application&#39;s src directory contains the following files</p>
+
+<ol type="1" start="1">
+
+<li>smoother.cpp : Defines a simple data structure that stores the smoothing operators weights and the routines for allocating memory, deallocating memory, and executing the smoothing operation.</li>
+
+<li>main.cpp : Defines the main program that sets up the 2-D field to be smoothed and managed file IO.</li>
+
+<li>makefile : A simple makefile is to build the application binary <code>smoother</code>.</li>
+
+<li>viz.py : A python script for creating plots of the smoother output</li>
+
+</ol>
+
+<h2 is-upgraded><strong>Install and Verify the Application</strong></h2>
+
+<p>To get started...</p>
+
+<ol type="1" start="1">
+
+<li>Clone the repository</li>
+
+</ol>
+
+<pre><code>$ git clone https://github.com/os-hackathon/amd-rocm-codelabs</code></pre>
+
+<ol type="1" start="2">
+
+<li>Build the smoother application. Keep in mind, the compiler is set to gcc by default in the provided makefile.</li>
+
+</ol>
+
+<pre><code>$ cd amd-codelab-demos/code/smoother_fortran/src
+
+$ make</code></pre>
+
+<ol type="1" start="3">
+
+<li>Test run the example. The application takes three arguments. The first two arguments are the number of grid cells in the x and y dimensions. The third argument is the number of times the smoothing operator is applied.</li>
+
+</ol>
+
+<p>$ ./smoother 1000 1000 100</p>
+
+<h2 is-upgraded><strong>Visualize the output (Optional)</strong></h2>
+
+<p>You can visualize the output with the provided <code>viz.py</code> python script. We recommend using virtual environments to install the script&#39;s dependencies</p>
+
+<ol type="1" start="1">
+
+<li>Start a virtual environment</li>
+
+</ol>
+
+<pre><code>$ python3 -m venv env
+
+$ source env/bin/activate</code></pre>
+
+<ol type="1" start="2">
+
+<li>Install the required packages</li>
+
+</ol>
+
+<pre><code>(env)$ pip3 install -r requirements.txt</code></pre>
+
+<ol type="1" start="3">
+
+<li>Execute viz.py</li>
+
+</ol>
+
+<pre><code>(env)$ python3 ./viz.py</code></pre>
+
+<p>This script saves a figure to <code>function.eps</code>. This figure shows the initial 2-D function before smoothing on the top and the smoothed field on the bottom. An example of the visualized output from the <code>smoother</code> example program is shown in the image below for a grid with 100x100 cells. The initial field is shown on the top, and the smoothed field is shown on the bottom after 100 iterations. Increasing the number of iterations (the second argument) will enhance the amount of smoothing and will further blur the image.<img style="width: 624.00px" src="img/36a5cdd828d91bbd.png"></p>
+
+<h2 is-upgraded><strong>Profile the Application</strong></h2>
+
+<p>Before starting any GPU porting exercise, it is important to profile your application to find hotspots where your application spends most of its time. Further, it is helpful to keep track of the runtime of the routines in your application so that you can later assess whether or not the GPU porting has resulted in improved performance. Ideally, your GPU-Accelerated application should outperform CPU-Only versions of your application when fully subscribed to available CPUs on a compute node.</p>
+
+<aside class="special"><p><strong>Tip:</strong> To obtain a fair comparison between CPU-Only and GPU-Accelerated versions of your application,  you will want to compare the run-time between fully-subscribed CPU-only routines and the GPU-ported routines. </p>
+
+<p>If your application is not parallelized on the CPU, you can estimate the idealized runtime on the CPU by dividing the serial runtime by the number of cores available on your target hardware.</p>
+
+</aside>
+
+<p>There are a number of open-source tools available for profiling C/C++ and Fortran applications, including <a href="https://www.cs.uoregon.edu/research/tau/home.php" target="_blank">Tau</a>, <a href="https://www.vi-hps.org/projects/score-p" target="_blank">Score-P</a>, <a href="https://vampir.eu/" target="_blank">Vampir</a>, and <a href="https://www.scalasca.org/" target="_blank">Scalasca</a>. In this tutorial, we are going to generate a profile and call graph using gprof. </p>
+
+<h3 is-upgraded><strong>Create the profile</strong></h3>
+
+<ol type="1" start="1">
+
+<li>Add -pg flag to the CFLAGS variable in the provided Makefile.</li>
+
+</ol>
+
+<pre><code>FFLAGS=-O0 -g -pg</code></pre>
+
+<ol type="1" start="2">
+
+<li>Remove files from your previous build.</li>
+
+</ol>
+
+<pre><code>$ make clean</code></pre>
+
+<ol type="1" start="3">
+
+<li>Make the smoother application</li>
+
+</ol>
+
+<pre><code>$ make</code></pre>
+
+<ol type="1" start="4">
+
+<li>Run the application. When the -pg flag is passed to the gcc compiler, executions of the application will create a file called gmon.out</li>
+
+</ol>
+
+<pre><code>$ ./smoother 1000 1000 100</code></pre>
+
+<ol type="1" start="5">
+
+<li>Create the profile</li>
+
+</ol>
+
+<pre><code>$ gprof ./smoother gmon.out &gt; profile.txt</code></pre>
+
+<aside class="special"><p><strong>Tip:</strong> If you are working with compilers other than GNU compilers, you can use <a href="https://developer.mantidproject.org/ProfilingWithValgrind.html" target="_blank">Valgrind&#39;s Callgrind</a> command line tool to create call-graphs and to conduct hotspot analysis.</p>
+
+</aside>
+
+<h3 is-upgraded><strong>Interpret the profile and callgraph</strong></h3>
+
+<p><code>gprof</code> provides a flat profile and a summary of your application&#39;s call structure indicating dependencies within your source code as a call graph. A <strong><em>call tree</em></strong> depicts the relationships between routines in your source code. Combining timing information with a call graph will help you plan the order in which you port routines to the GPU.</p>
+
+<p>The first section of the gprof output is the flat-profile. An example flat-profile for the <code>smoother</code> application is given below. The flat-profile provides a list of routines in your application, ordered by the percent time your program spends within those routines from greatest to least. Beneath the flat-profile, gprof provides documentation of each of the columns for your convenience.</p>
+
+<pre><code>  %   cumulative   self              self     total           
+
+ time   seconds   seconds    calls   s/call   s/call  name    
+
+ 97.67     11.50    11.50      100     0.11     0.11  __smoother_MOD_applysmoother
+
+  2.30     11.77     0.27      100     0.00     0.00  __smoother_MOD_resetf
+
+  0.17     11.79     0.02        1     0.02    11.79  MAIN__
+
+  0.00     11.79     0.00        3     0.00     0.00  __smoother_MOD_str2int
+
+  0.00     11.79     0.00        1     0.00     0.00  __smoother_MOD_getcliconf</code></pre>
+
+<p>Let&#39;s now take a look at at the call tree. This call tree has five entries, one for each routine in our program. The right-most field for each entry indicates the routines that called each routine and that are called by each routine. </p>
+
+<p>For <code>smoother</code>, the first entry shows that main calls <code>applySmoother</code>, <code>resetF</code>, and <code>getCLIConf</code>. Further, the called column indicates that applySmoother and resetF routines are shown to be called 100 times (in this case) by main. The self and children columns indicate that main spends 0.02s executing instructions in main and 11.77s in calling other routines. Further, of those 11.77s, 11.50s are spent in <code>applySmoother</code> and 0.27 are spent in <code>resetF</code>. </p>
+
+<pre><code>index % time    self  children    called     name
+
+                0.02   11.77       1/1           main [2]
+
+[1]    100.0    0.02   11.77       1         MAIN__ [1]
+
+               11.50    0.00     100/100         __smoother_MOD_applysmoother [3]
+
+                0.27    0.00     100/100         __smoother_MOD_resetf [4]
+
+                0.00    0.00       1/1           __smoother_MOD_getcliconf [12]
+
+-----------------------------------------------
+
+                                                 &lt;spontaneous&gt;
+
+[2]    100.0    0.00   11.79                 main [2]
+
+                0.02   11.77       1/1           MAIN__ [1]
+
+-----------------------------------------------
+
+               11.50    0.00     100/100         MAIN__ [1]
+
+[3]     97.5   11.50    0.00     100         __smoother_MOD_applysmoother [3]
+
+-----------------------------------------------
+
+                0.27    0.00     100/100         MAIN__ [1]
+
+[4]      2.3    0.27    0.00     100         __smoother_MOD_resetf [4]
+
+-----------------------------------------------
+
+                0.00    0.00       3/3           __smoother_MOD_getcliconf [12]
+
+[11]     0.0    0.00    0.00       3         __smoother_MOD_str2int [11]
+
+-----------------------------------------------
+
+                0.00    0.00       1/1           MAIN__ [1]
+
+[12]     0.0    0.00    0.00       1         __smoother_MOD_getcliconf [12]
+
+                0.00    0.00       3/3           __smoother_MOD_str2int [11]
+
+-----------------------------------------------</code></pre>
+
+<aside class="special"><p><strong>Tip:</strong> You can use the open-source <a href="https://github.com/jrfonseca/gprof2dot" target="_blank">gprof2dot</a> to create visualizations of gprof output to help interpret the profile and call-graph for more complex applications.</p>
+
+</aside>
+
+<h3 is-upgraded><strong>Next steps</strong></h3>
+
+<p>Now that we have a profile and an understanding of the call structure of the application, we can now plan our port to GPUs. First, we will focus on porting the applySmoother routine and the necessary data to the GPU, since applySmoother takes up the majority of the run time. </p>
+
+<p>When we port this routine, we will introduce data allocation on the GPU and data copies between CPU and GPU. This data movement may potentially increase the overall application runtime, even if the applySmoother routine performs better. In this event, we will then work on minimizing data movements between CPU and GPU. </p>
+
+<aside class="special"><p class="image-container"><img style="width: 231.82px" src="img/fb9a02e8f06a74cb.png"></p>
+
+<p><strong>Tip:</strong> As a general strategy, it is recommended that you approach GPU porting in small incremental steps. Each step should consist of (1) profiling, (2) planning, (3) implementing planned changes &amp; verifying the application output, and (4) committing the changes to your repository.</p>
+
+</aside>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Moving Data to the GPU with hipfort" duration="20">
+
+        <aside class="special"><p><strong>Tip: </strong>Before getting started in this section, make sure that <code>hipfort</code> is in your path by running <code>hipfort --version</code>. Additionally, if you are on an Nvidia platform, make sure that <code>nvcc</code> is in your path by running <code>nvcc --version</code>.</p>
+
+</aside>
+
+<p>In the <code>smoother</code> application, we have seen that the <code>applySmoother</code> routine, called by <code>main</code>, takes up the most time. Looking at the main iteration loop in lines 51-56 in <code>main.F90</code> and the <code>applySmoother</code> function in <code>smoother.F90</code>, we see that this function takes in arrays  <code>f</code> and <code>weights</code> and integers <code>nW</code>, <code>nX</code>, and <code>nY</code>. Each call to <code>ApplySmoother</code> returns the <code>smoothF</code> array.</p>
+
+<pre><code> 51     DO iter = 1, nIter
+
+ 52 
+
+ 53       smoothF = ApplySmoother( f, weights, nW, nX, nY )
+
+ 54       CALL ResetF( f, smoothF, nW, nX, nY )
+
+ 55 
+
+ 56     ENDDO</code></pre>
+
+<p>In order to offload <code>applySmoother</code> to the GPU, we will need to copy the <code>f</code> and <code>weights</code> arrays to the GPU. After calling <code>smoothF</code>, we will want to copy <code>smoothF</code> back to the CPU before calling <code>resetF</code>.</p>
+
+<h2 is-upgraded><strong>Saving Reference Output</strong></h2>
+
+<p>Before making changes to the source code, you&#39;ll first want to save the existing output so that you have a reference to compare against later. Having reference output to compare against is critical to verifying that source code changes you make do not change the results.</p>
+
+<p>To do this, make a directory called <code>reference/</code> and copy function.txt and smooth-function.txt to this directory. These files were created during the initial execution of the smoother application in the previous section of this codelab.</p>
+
+<pre><code>$ mkdir ./reference
+
+$ mv function.txt smooth-function.txt ./reference/</code></pre>
+
+<aside class="special"><p><strong>Tip : </strong>When verifying changes you will make later in this codelab, make sure that you use the same input parameters to the <code>smoother</code> application that were used to generate the reference output. </p>
+
+</aside>
+
+<h2 is-upgraded><strong>Copying ALLOCATABLE data to the GPU</strong></h2>
+
+<p>In this section, you will learn how to allocate memory on the GPU and copy data between the host and device using hipfort. You&#39;ll start by inserting calls to allocate and deallocate device memory with hipMalloc and hipFree. Once this is working, you&#39;ll then copy data between the CPU and GPU with hipMemcpy.</p>
+
+<h3 is-upgraded><strong>Allocating Device Memory</strong></h3>
+
+<ol type="1" start="1">
+
+<li>Add <code>USE</code> statements for <code>hipfort</code>, <code>hipfort_check</code>, and <code>ISO_C_BINDING</code> at the top of <code>main.F90</code>. We use ISO_C_BINDING because you will need to declare C-Pointers that you will use to reference memory on the GPU.</li>
+
+</ol>
+
+<pre><code>  1 PROGRAM main
+
+  2 
+
+  3 USE smoother
+
+  4 USE hipfort
+
+  5 USE hipfort_check
+
+  6 USE ISO_C_BINDING
+
+  7 
+
+  8 IMPLICIT NONE</code></pre>
+
+<ol type="1" start="2">
+
+<li>Change the ALLOCATABLE arrays to Fortran POINTER and add declarations for device copies of the <code>f</code>, <code>smoothF</code>, and <code>weights</code> arrays. The device copies must be declared as <code>TYPE(c_ptr)</code>.</li>
+
+</ol>
+
+<pre><code>  8 IMPLICIT NONE
+
+  9   
+
+ 10   INTEGER, PARAMETER :: nW = 2
+
+ 11   INTEGER :: nX, nY, nIter
+
+ 12   REAL(prec), POINTER :: f(:,:)
+
+ 13   REAL(prec), POINTER :: smoothF(:,:)
+
+ 14   REAL(prec), POINTER :: weights(:,:)
+
+ 15   TYPE(c_ptr) :: f_dev
+
+ 16   TYPE(c_ptr) :: smoothF_dev
+
+ 17   TYPE(c_ptr) :: weights_dev
+
+ 18   REAL(prec) :: dx, dy, x, y
+
+ 19   INTEGER :: i, j, iter
+
+</code></pre>
+
+<ol type="1" start="3">
+
+<li>Next, insert calls to <code>hipMalloc</code> wrapped inside of <code>hipCheck</code> to allocate space for <code>f_dev</code>, <code>smoothF_dev</code>, and <code>weights_dev</code>. You will want to insert these calls after the ALLOCATE statements for <code>f</code>, <code>smoothF</code>, and <code>weights</code>.<br></li>
+
+</ol>
+
+<aside class="special"><p><code>hipMalloc</code> requires a C-pointer and the size of the memory block to allocate and associate with the C-pointer. Since the device copies will hold the same amount of memory as the host versions of the arrays, you can use <code>SIZEOF</code> intrinsic to specify the amount of memory. </p>
+
+</aside>
+
+<aside class="special"><p><code>hipCheck</code> is subroutine provided by the <a href="https://github.com/ROCmSoftwarePlatform/hipfort" target="_blank">hipfort</a> library that will check the error code that is returned by the enclosed HIP API call.</p>
+
+</aside>
+
+<pre><code> 25     ! Allocate device memory
+
+ 26     CALL hipCheck(hipMalloc(f_dev, SIZEOF(f)))
+
+ 27     CALL hipCheck(hipMalloc(smoothF_dev, SIZEOF(smoothF)))
+
+ 28     CALL hipCheck(hipMalloc(weights_dev, SIZEOF(weights)))</code></pre>
+
+<ol type="1" start="4">
+
+<li>At the end of <code>main.F90</code>, insert calls to <code>hipFree</code> (wrapped inside <code>hipCheck</code>) to free memory held by <code>f_dev</code>, <code>smoothF_dev</code>, and <code>weights_dev</code>.</li>
+
+</ol>
+
+<pre><code> 77     ! Deallocate GPU memory
+
+ 78     CALL hipCheck( hipFree(f_dev) )
+
+ 79     CALL hipCheck( hipFree(smoothF_dev) )
+
+ 80     CALL hipCheck( hipFree(weights_dev) )</code></pre>
+
+<ol type="1" start="5">
+
+<li>Before going too much further, let&#39;s check to make sure the code compiles and runs with these changes. Save the changes you&#39;ve just made to main.F90 and open the Makefile. Change the compiler to <code>hipfc</code> and save your changes.</li>
+
+</ol>
+
+<pre><code>FC=hipfc
+
+FFLAGS=-O0 -g</code></pre>
+
+<ol type="1" start="6">
+
+<li>Remove the <code>*.o</code> files and the <code>smoother</code> binary to ensure a clean build and make a new <code>smoother</code> binary</li>
+
+</ol>
+
+<pre><code>$ make clean &amp;&amp; make smoother</code></pre>
+
+<ol type="1" start="7">
+
+<li>Run <code>smoother</code> with the same input parameters as you did in the previous section and verify the output is unchanged. We use the diff command line utility to compare the output files and the reference files. If there are no differences, diff will produce no output.</li>
+
+</ol>
+
+<pre><code>$ ./smoother 1000 1000 100
+
+$ diff function.txt reference/function.txt
+
+$ diff smooth-function.txt reference.txt</code></pre>
+
+<ol type="1" start="8">
+
+<li>You can verify that data is allocated on the GPU and that data is copied from the CPU to GPU by using a profiler. When running under the profiler on AMD platforms, you should observe three (3) calls to hipMalloc and three (3) calls to hipFree. On Nvidia platforms, you should observe three (3) calls to cudaMalloc and three (3) calls to cudaFree</li>
+
+</ol>
+
+<p><br>For AMD platforms, use <code>rocprof</code> with the <code>--hip-trace</code> flag. Running rocprof will create a file called <code>profile.json</code>. The contents of <code>results.hip_stats.csv</code> will show a summary of calls to <code>hipMalloc</code>, <code>hipMemcpy</code>, and <code>hipFree</code>.<br></p>
+
+<pre><code></code></pre>
+
+<p><br>For Nvidia platforms, use <code>nvprof</code>. When running on Nvidia platforms, you can expect to see calls to <code>cudaMalloc</code>, <code>cudaMemcpy</code>, and <code>cudaFree</code>.</p>
+
+<pre><code>$ nvprof ./smoother 1000 1000 100
+
+ Info : nX =         1000
+
+ Info : nY =         1000
+
+ Info : nIter =          100
+
+==51822== NVPROF is profiling process 51822, command: ./smoother 1000 1000 100
+
+==51822== Profiling application: ./smoother 1000 1000 100
+
+==51822== Profiling result:
+
+No kernels were profiled.
+
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+
+      API calls:   99.34%  181.04ms         3  60.347ms  93.226us  180.85ms  cudaMalloc
+
+                    0.28%  505.78us         3  168.59us  154.91us  178.66us  cudaFree
+
+                    0.23%  420.70us       101  4.1650us     176ns  246.17us  cuDeviceGetAttribute
+
+                    0.11%  199.40us         1  199.40us  199.40us  199.40us  cuDeviceTotalMem
+
+                    0.04%  68.947us         1  68.947us  68.947us  68.947us  cuDeviceGetName
+
+                    0.01%  9.4030us         1  9.4030us  9.4030us  9.4030us  cuDeviceGetPCIBusId
+
+                    0.00%  1.3880us         3     462ns     258ns     850ns  cuDeviceGetCount
+
+                    0.00%     809ns         2     404ns     185ns     624ns  cuDeviceGet
+
+                    0.00%     384ns         1     384ns     384ns     384ns  cuDeviceGetUuid</code></pre>
+
+<aside class="special"><p><strong>Tip: </strong>Now that you have made changes to the source code and have verified that the output has not changed, this is a good point to commit your changes to your local git repository. When working on larger codes, testing with every commit and committing frequently can help make a GPU porting project more predictable and manageable.</p>
+
+</aside>
+
+<h2 is-upgraded><strong>Copying Data between the Host and Device</strong></h2>
+
+<p>So far, you have a code that has both CPU (host) and GPU (device) memory. You are now ready to make calls to transfer data between the host and device. </p>
+
+<p>Recall from the first section of this codelab that the <code>applySmoother</code> routine is the most expensive routine. Because of this we&#39;ll start by focusing on moving necessary to the GPU before the call to <code>applySmoother</code>, and moving data from the GPU after.</p>
+
+<p>To copy data to the GPU (Host To Device), you will use <code>hipMemcpy</code>, e.g.</p>
+
+<pre><code>hipMemcpy( target, src size, hipMemcpyHostToDevice )</code></pre>
+
+<p>The arguments for <code>hipMemcpy</code> are a pointer to where data will be copied to (<code>target</code>), a pointer to the source of data (<code>src</code>),  the amount of data being copied (<code>size</code>), and an enum provided by the HIP library. When copying from host-to-device, this last argument is <code>hipMemcpyHostToDevice</code>. When copying from device-to-host, this last argument is <code>hipMemcpyDeviceToHost</code>.</p>
+
+<p>Keep in mind that <code>hipMemcpy</code> is expecting locations in memory as arguments for either src or target. When working in Fortran, you will have to use the <code>c_loc</code> intrinsic from the <code>ISO_C_BINDING</code> library to obtain the memory location for Fortran pointers (this is why you converted the <code>ALLOCATABLE</code> attributes to <code>POINTER</code>).</p>
+
+<ol type="1" start="1">
+
+<li>Since the weights array does not change with each iteration, insert a call to hipMemcpy wrapped inside the hipCheck routine to copy weights to weights_dev before the iteration loop starts.</li>
+
+</ol>
+
+<p> 61     ! Copy weights to weights_dev</p>
+
+<p> 62     CALL hipCheck(hipMemcpy(weights_dev, c_loc(weights), SIZEOF(weights), hipMemcpyHostToDevice))</p>
+
+<ol type="1" start="2">
+
+<li>Just before the call to applySmoother, inside the iteration loop, insert calls to hipMemcpy wrapped inside the hipCheck routine to copy f to f_dev.</li>
+
+</ol>
+
+<pre><code> 64     DO iter = 1, nIter
+
+ 65 
+
+ 66       ! Copy f to f_dev
+
+ 67       CALL hipCheck(hipMemcpy(f_dev, c_loc(f), SIZEOF(f), hipMemcpyHostToDevice))</code></pre>
+
+<ol type="1" start="3">
+
+<li>When we first port the applySmoother routine to the GPU, we will leave resetF on the CPU. Because of this, we will need to have smoothF copied back to the CPU before calling resetF. Now, just after the call to applySmoother and before the call to resetF, insert a call to hipMemcpy wrapped inside the hipCheck routine to copy smoothF_dev from the device to the host.</li>
+
+</ol>
+
+<pre><code> 68 
+
+ 69       smoothF = ApplySmoother( f, weights, nW, nX, nY )
+
+ 70       
+
+ 71       ! Copy smoothF_dev to smoothF
+
+ 72       CALL hipCheck(hipMemcpy(c_loc(smoothF), smoothF_dev, SIZEOF(smoothF), hipMemcpyDeviceToHost))</code></pre>
+
+<ol type="1" start="4">
+
+<li>Save your changes in main.F90 and recompile the application to make sure there are no syntax errors in your recent code modifications. <br></li>
+
+<li>If you run the application, the output will be incorrect because we are copying smoothF_dev to smoothF, which currently has uninitialized memory. Nonetheless, run the application under a profiler to verify that calls to hipMemcpy ( or cudaMemcpy for Nvidia devices ) are executed.<br><br>For AMD platforms, use <code>rocprof</code> with the <code>--hip-trace</code> flag. Running rocprof will create a file called <code>profile.json</code>. The contents of <code>results.hip_stats.csv</code> will show calls to <code>hipMalloc</code>, <code>hipMemcpy</code>, and <code>hipFree</code>.</li>
+
+</ol>
+
+<pre><code>$ rocprof --hip-trace ./smoother 1000 1000 100
+
+$ cat results.hip_stats.csv 
+
+&#34;Name&#34;,&#34;Calls&#34;,&#34;TotalDurationNs&#34;,&#34;AverageNs&#34;,&#34;Percentage&#34;
+
+hipMemcpy,201,696108877,3463228,99.94123584828755
+
+hipMalloc,3,216944,72314,0.031146925698335683
+
+hipFree,3,192359,64119,0.02761722601411495</code></pre>
+
+<p><br>For Nvidia platforms, use <code>nvprof</code>. At this stage, you should see three calls to <code>cudaMalloc</code>, three calls to <code>cudaFree</code>,  201 calls to <code>cudaMemcpy</code> with 100 calls for <code>DeviceToHost</code>, and 101 calls for <code>HostToDevice</code>.</p>
+
+<pre><code>$ nvprof ./smoother 1000 1000 100
+
+ Info : nX =         1000
+
+ Info : nY =         1000
+
+ Info : nIter =          100
+
+==74347== NVPROF is profiling process 74347, command: ./smoother 1000 1000 100
+
+==74347== Profiling application: ./smoother 1000 1000 100
+
+==74347== Profiling result:
+
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+
+ GPU activities:   54.03%  44.247ms       100  442.47us  427.58us  555.39us  [CUDA memcpy DtoH]
+
+                   45.97%  37.645ms       101  372.72us  1.4720us  467.10us  [CUDA memcpy HtoD]
+
+      API calls:   63.95%  171.63ms         3  57.210ms  100.12us  171.43ms  cudaMalloc
+
+                   35.63%  95.610ms       201  475.67us  34.390us  676.19us  cudaMemcpy
+
+                    0.18%  491.33us         3  163.78us  146.94us  172.58us  cudaFree
+
+                    0.15%  407.74us       101  4.0370us     142ns  242.63us  cuDeviceGetAttribute
+
+                    0.06%  166.19us         1  166.19us  166.19us  166.19us  cuDeviceTotalMem
+
+                    0.02%  64.694us         1  64.694us  64.694us  64.694us  cuDeviceGetName
+
+                    0.00%  2.4970us         1  2.4970us  2.4970us  2.4970us  cuDeviceGetPCIBusId
+
+                    0.00%  1.0260us         3     342ns     186ns     625ns  cuDeviceGetCount
+
+                    0.00%     601ns         2     300ns     149ns     452ns  cuDeviceGet
+
+                    0.00%     288ns         1     288ns     288ns     288ns  cuDeviceGetUuid
+
+</code></pre>
+
+<aside class="warning"><p><strong>Caution: </strong>Copying smoothF_dev to <code>smoothF</code> will produce an incorrect result until the <code>applySmoother</code> routine is offloaded to the GPU, which we will complete in the next section. This happens because <code>smoothF_dev</code> currently contains uninitialized data that we use to update <code>smoothF</code>.</p>
+
+</aside>
+
+<h2 is-upgraded><strong>Next steps</strong></h2>
+
+<p>At this point, you now have the necessary data declared on the GPU. Additionally, you used hipMemcpy to make the input to applySmoother available on the GPU. In the next step, you will create a HIP kernel that will run the applySmoother algorithm on the GPU and replace the call to applySmoother with a call to launch this kernel.</p>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="HIP Kernel Launch Basics" duration="10">
+
+        <p>Routines that are executed on the GPU are typically scheduled to run by issuing instructions from the host (CPU). In HIP, a GPU kernel is launched through a call to hipLaunchKernelGGL. When scheduling GPU kernel execution,  you specify </p>
+
+<ol type="1" start="1">
+
+<li>The kernel name,</li>
+
+<li>The number of threads and the thread grouping,</li>
+
+<li>The amount of Local Data Share (LDS) memory (Shared Memory) per block, and </li>
+
+<li>The stream ID.</li>
+
+</ol>
+
+<p>Keep in mind that HIP kernels must be written in C++. In this section, we&#39;ll cover the basics of writing and launching a HIP kernel in C++ and conclude with a brief overview of how we will launch a HIP kernel from Fortran.</p>
+
+<h2 is-upgraded><strong>Threads, Blocks, and LDS Memory</strong></h2>
+
+<p>When a kernel is launched, all requested threads on the GPU execute the kernel instructions concurrently. How the threads are scheduled to execute the instructions depends on the thread grouping. Threads are grouped into blocks in the HIP and CUDA programming models. Threads within a block are able to share LDS memory and L1 Cache on GPU Compute Units (Streaming Multiprocessor in Nvidia/CUDA terminology).</p>
+
+<p>Within a HIP kernel, you are able to use HIP intrinsics to determine the unique ID of a thread. This allows you to codify memory access patterns for each thread within a kernel and expose SIMD parallelism. These intrinsics are summarized the table below.</p>
+
+<table>
+
+<tr><td colspan="1" rowspan="1"><p><strong>Intrinsic</strong></p>
+
+</td><td colspan="1" rowspan="1"><p><strong>Description</strong></p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>hipBlockIDx_[x,y,z]</p>
+
+</td><td colspan="1" rowspan="1"><p>The block ID in the [x,y,z] grid directions.</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>hipBlockDimx_[x,y,z]</p>
+
+</td><td colspan="1" rowspan="1"><p>The number of threads within each block in the [x,y,z] grid directions.</p>
+
+</td></tr>
+
+<tr><td colspan="1" rowspan="1"><p>hipThreadIDx_[x,y,z]</p>
+
+</td><td colspan="1" rowspan="1"><p>The local thread ID within a block in the [x,y,z] block directions.</p>
+
+</td></tr>
+
+</table>
+
+<aside class="special"><p><strong>Note:</strong> Block dimensions (threads-per-block) and Grid dimensions (number-of-blocks) are expressed as <a href="https://github.com/ROCm-Developer-Tools/HIP/blob/master/docs/markdown/hip_kernel_language.md#dim3" target="_blank">dim3</a> variables, giving 3 dimensions (x,y,z). </p>
+
+</aside>
+
+<h3 is-upgraded><strong>Example</strong></h3>
+
+<p>To see how this works, consider this simple example kernel that takes in a device array and returns the same array multiplied by two.</p>
+
+<pre><code>__global__ void myKernel(int N, double *d_a) {
+
+  int i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x;
+
+  if (i&lt;N) {
+
+    d_a[i] *= 2.0;
+
+  }
+
+}</code></pre>
+
+<p>In this example, when the kernel is launched, each thread will calculate i based on its thread ID within a block, its block ID, and the number of threads-per-block (hipBlockDimx_x). A conditional is added to ensure that threads only access in-bounds addresses of d_a. Provided this conditional is met for a thread, that thread will double the i-th element of d_a, concurrently with other threads.</p>
+
+<h3 is-upgraded><strong>Best practice</strong></h3>
+
+<p>On AMD GPUs, threads in a block are executed in 64-wide chunks called &#34;wavefronts&#34;. Because of this, it is good practice to make block sizes a multiple of 64 on AMD GPUs.</p>
+
+<p>On Nvidia GPUs, threads in a block are executed in 32-wide chunks called &#34;warps&#34; and it is good practice to make the block size a multiple of 32.</p>
+
+<aside class="warning"><p><strong>Caution: </strong>The number of threads per block, number of blocks, and the amount of local dynamic memory per block are limited; these limits can be found using <a href="https://github.com/RadeonOpenCompute/rocminfo" target="_blank">rocminfo</a> on AMD platforms and the <a href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#running-binaries" target="_blank">deviceQuery CUDA-Toolkit example</a> on Nvidia platforms. </p>
+
+</aside>
+
+<h2 is-upgraded><strong>Streams</strong></h2>
+
+<p>In this codelab, we will always set the stream ID to 0. Using multiple streams is useful when you want to run multiple GPU kernels concurrently. This strategy is useful when you are having difficulty keeping GPUs fully subscribed and you have code that has instruction-level parallelism.</p>
+
+<h2 is-upgraded><strong>Launch from Fortran - ISO C Binding</strong></h2>
+
+<p>The ISO C Binding module provides the necessary components to enable Fortran-C interoperability. To call HIP kernels in Fortran, you will need to do the following</p>
+
+<ol type="1" start="1">
+
+<li>Write the GPU accelerated HIP kernel in C++.</li>
+
+<li>Write a wrapper routine in C++ that launches the HIP kernel.</li>
+
+<li>Define a subroutine interface block in Fortran that binds to the wrapper routine in C++.</li>
+
+</ol>
+
+<h3 is-upgraded><strong>Example</strong></h3>
+
+<p>As an example, suppose that you want to offload the following Fortran subroutine to the GPU with HIP.</p>
+
+<pre><code>SUBROUTINE VecAdd( a, b, c, N )
+
+  IMPLICIT NONE
+
+  INTEGER, INTENT(in) :: N
+
+  REAL, INTENT(in) :: a(1:N), b(1:N)
+
+  REAL, INTENT(out) :: c(1:N)
+
+
+
+    DO i = 1, N
+
+      c(i) = a(i) + b(i)
+
+    ENDDO
+
+END SUBROUTINE VecAdd</code></pre>
+
+<p>To offload to the GPU, you will first need to write the equivalent HIP kernel in C++,</p>
+
+<pre><code>__global__ void VecAdd_HIP(float *a, float *b, float *c, int N) {
+
+  int i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x;
+
+  if (i&lt;N) {
+
+    c[i] = a[i] + b[i];
+
+  }
+
+}</code></pre>
+
+<p>Then, you will write a wrapper routine in C++ that launches this kernel</p>
+
+<pre><code>extern &#34;C&#34;
+
+{
+
+  void VecAdd_HIPWrapper(float **a, float **b, float **c, int N) {
+
+    hipLaunchKernelGGL( (VecAdd_HIP), dim3(N/64+1,1,1), dim3(64,1,1), 0, 0, *a, *b, *c, N); 
+
+  }
+
+}</code></pre>
+
+<p>In your Fortran source code, usually a module, you will add a subroutine interface block to expose the C++ wrapper routine to Fortran</p>
+
+<pre><code>INTERFACE
+
+  SUBROUTINE VecAdd_HIPWrapper(a, b, c, N) bind(c,name=&#34;VecAdd_HIPWrapper&#34;)
+
+    USE ISO_C_BINDING
+
+    IMPLICIT NONE
+
+      TYPE(c_ptr) :: a, b, c
+
+      INTEGER, VALUE :: N
+
+  END SUBROUTINE VecAdd_HIPWrapper
+
+END INTERFACE</code></pre>
+
+<p>Once these three components are defined, you can then launch the GPU accelerated kernel from Fortran by simply calling <code>VecAdd_HIPWrapper</code>.</p>
+
+<p>In the next section of this codelab, you will use these three steps to offload the applySmoother routine to the GPU.</p>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Offload the Smoothing Kernel to the GPU" duration="20">
+
+        <p>In this section, you will offload the <code>ApplySmoother</code> routine to the GPU.</p>
+
+<h2 is-upgraded><strong>Planning the GPU port</strong></h2>
+
+<p>Let&#39;s look at the <code>ApplySmoother</code> subroutine from <code>smoother.F90</code></p>
+
+<pre><code>SUBROUTINE ApplySmoother( f, weights, smoothF, nW, nX, nY )
+
+  IMPLICIT NONE
+
+  REAL(prec), INTENT(in) :: f(1:nX,1:nY)
+
+  REAL(prec), INTENT(in) :: weights(-nW:nW,-nW:nW)
+
+  INTEGER, INTENT(in) :: nW, nX, nY
+
+  REAL(prec), INTENT(inout) :: smoothF(1:nX,1:nY)
+
+  ! Local
+
+  INTEGER :: i, j, ii, jj
+
+
+
+    DO j = 1+nW, nY-nW
+
+      DO i = 1+nW, nX-nW
+
+        ! Take the weighted sum of f to compute the smoothF field
+
+        smoothF(i,j) = 0.0_prec
+
+        DO jj = -nW, nW
+
+          DO ii = -nW, nW
+
+            smoothF(i,j) = smoothF(i,j) + f(i+ii,j+jj)*weights(ii,jj)
+
+          ENDDO
+
+        ENDDO
+
+      ENDDO
+
+    ENDDO
+
+END SUBROUTINE ApplySmoother</code></pre>
+
+<p>The outer loops, over i and j, are tightly nested loops over a 2-D grid. The size of these loops are nY-2*nW and nX-2*nW. The values of nX and nY are determined by the user through the first two command line arguments (we have been using 1000 for), and <code>nW</code> is 2 (see the declarations in <code>main.F90</code>). Within the i and j loops, we carry out a reduction operation for smLocal and then assign the value to each element of smoothF.</p>
+
+<p>In the applySmoother algorithm, the order in which we execute the i and j loops does not matter. Further, the size of each loop is O(1000) for the example we&#39;re working with. A good strategy for offloading this routine to the GPU is to have each GPU thread execute the instructions within the i and j loops. Ideally, then we want each thread to execute something the following</p>
+
+<pre><code>    real smLocal = 0.0;
+
+    for( int jj=-nW; jj &lt;= nW; jj++ ){
+
+      for( int ii=-nW; ii &lt;= nW; ii++ ){
+
+        iel = (i+ii)+(j+jj)*nX;
+
+        ism = (ii+nW) + (jj+nW)*(2*nW+1);
+
+        smLocal += f[iel]*smoothOperator-&gt;weights[ism];
+
+      }
+
+    }
+
+    iel = i+j*nX;
+
+    smoothF[iel] = smLocal;</code></pre>
+
+<p>Notice now the i and j loops are gone. Within the HIP kernel, we can calculate i and j from hipThreadIdx_[x,y], hipBlockIdx_[x,y], and hipBlockDim_[x,y], assuming that we will launch the kernel with 2-D Grid and Block dimensions. You can use something like the following to calculate i and j.</p>
+
+<pre><code>  size_t i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x;
+
+  size_t j = hipThreadIdx_y + hipBlockIdx_y*hipBlockDim_y;</code></pre>
+
+<aside class="warning"><p><strong>Caution: </strong>In Fortran we can easily control the lower and upper indices for multi-dimensional arrays. When writing HIP kernels, we will use flat 1-D arrays. Additionally, arrays in C use 0-based indexing. </p>
+
+</aside>
+
+<aside class="special"><p><strong>Note:</strong> hipThreadIdx_[x,y] and hipBlockIdx_[x,y] are 0-based indices.</p>
+
+</aside>
+
+<p>Within the main program, you will be able to launch the GPU kernel, but you will need to calculate the Grid and Block Dimensions. For now, let&#39;s assume that the number of threads-per-block in the i and j loop dimensions (x and y directions) is fixed at 16. With the number of threads-per-block (in each direction) chosen, you can calculate the grid dimensions, by requiring the x and y grid dimensions to be greater than or equal to the i and j loop sizes, respectively.</p>
+
+<aside class="special"><p><strong>Note:</strong> In general, the number of threads-per-block will impact the application runtime and you will want to use a suitable profiler to help optimize performance. </p>
+
+<p>On AMD platforms, threads in a block are executed in 64-wide chunks called &#34;wavefronts&#34; and it is good practice is to make the block size a multiple of 64.</p>
+
+<p>On Nvidia platforms, threads in a block are executed in 32-wide chunks called &#34;warps&#34; and it is good practice is to make the block size a multiple of 32.</p>
+
+</aside>
+
+<h2 is-upgraded><strong>Write the HIP Kernels in C++</strong></h2>
+
+<ol type="1" start="1">
+
+<li>You may have noticed that the floating point precision is set in <code>smoother.F90</code> and can be controlled using a C-Preprocessor flag. To extend this feature into the HIP kernels, add a header file, called <code>precision.h</code>. In this header file, define the type <code>real</code> to be <code>double</code> if the <code>DOUBLE_PRECISION</code> preprocessor flag is defined, and <code>float</code> otherwise.</li>
+
+</ol>
+
+<pre><code>#include &lt;float.h&gt;
+
+ 
+
+#ifdef DOUBLE_PRECISION
+
+  typedef double real;
+
+#else
+
+  typedef float real;
+
+#endif</code></pre>
+
+<ol type="1" start="2">
+
+<li>Create a new file called <code>smoother_HIP.cpp</code>. This file will contain the C++ source code for the HIP Kernel and the wrapper routine. Start by adding statements to include the HIP runtime and <code>precision.h</code>.</li>
+
+</ol>
+
+<pre><code>#include &#34;precision.h&#34;
+
+#include &lt;hip/hip_runtime.h&gt;</code></pre>
+
+<ol type="1" start="3">
+
+<li>Add a new routine, <code>ApplySmoother_gpu</code>. This routine needs to be of type <code>__global__</code> so that it can be launched on the GPU (device) from the CPU (host) using <code>hipLaunchKernelGGL</code>.</li>
+
+</ol>
+
+<pre><code>__global__ void ApplySmoother_gpu(real *f_dev, real *weights_dev, real *smoothF_dev, int nW, int nX, int nY)
+
+{
+
+  size_t i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x + nW;
+
+  size_t j = hipThreadIdx_y + hipBlockIdx_y*hipBlockDim_y + nW;
+
+  int iel, ism;
+
+  
+
+  if( i &gt;= nW &amp;&amp; i &lt; nX-nW &amp;&amp; j &gt;= nW &amp;&amp; j&lt; nY-nW){
+
+    real smLocal = 0.0;
+
+    for( int jj=-nW; jj &lt;= nW; jj++ ){
+
+      for( int ii=-nW; ii &lt;= nW; ii++ ){
+
+        iel = (i+ii)+(j+jj)*nX;
+
+        ism = (ii+nW) + (jj+nW)*(2*nW+1);
+
+        smLocal += f_dev[iel]*weights_dev[ism];
+
+      }
+
+    }
+
+    iel = i+j*nX;
+
+    smoothF_dev[iel] = smLocal;
+
+  }
+
+}</code></pre>
+
+<aside class="special"><p><strong>Note:</strong> We&#39;ve added <code>nW</code> to <code>i</code> and <code>j</code> since the original loops began at <code>i=nW</code> and <code>j=nW</code>. Also, notice that we&#39;ve added conditionals to safely ensure that threads do not step outside of the memory bounds of <code>f_dev</code>, <code>weights_dev</code>, and <code>smoothF_dev</code>.</p>
+
+</aside>
+
+<ol type="1" start="4">
+
+<li>Next, add a wrapper routine in <code>smoother_HIP.cpp</code> that will launch the HIP kernel. Additionally, you will want to declare the wrapper routine as <code>extern &#34;C&#34;</code>, so that it can be called from Fortran through ISO C Binding. In this routine, you can calculate the grid and block size for the kernel launch. Here, we&#39;ve set the number of threads in the x and y directions to 16 and calculated the grid dimensions by evenly dividing the x and y extents of the outer loops of the original <code>applySmoother</code> routine by 16.</li>
+
+</ol>
+
+<pre><code>extern &#34;C&#34;
+
+{
+
+  void ApplySmoother_HIP(real **f_dev, real **weights_dev, real **smoothF_dev, int nW, int nX, int nY)
+
+  {
+
+    int threadsPerBlock = 16;
+
+    int gridDimX = (nX-2*nW)/threadsPerBlock + 1;
+
+    int gridDimY = (nY-2*nW)/threadsPerBlock + 1;
+
+     
+
+    hipLaunchKernelGGL((applySmoother_gpu), dim3(gridDimX,gridDimY,1), dim3(threadsPerBlock,threadsPerBlock,1), 0, 0, *weights_dev, *f_dev, *smoothF_dev, nX, nY, nW);
+
+  } 
+
+} </code></pre>
+
+<h2 is-upgraded><strong>Add Calls from Fortran to Launch the HIP Kernel</strong></h2>
+
+<p>Now that the HIP kernel and a wrapper routine are both defined, we need to modify the Fortran source code to expose the wrapper routine using an INTERFACE block in the smoother.F90 module. Then, in the main.F90 program, you will replace the call to <code>ApplySmoother</code> with a call to <code>ApplySmoother_HIP</code>.</p>
+
+<ol type="1" start="1">
+
+<li>Open the <code>smoother.F90</code> module.</li>
+
+<li>Add an <code>INTERFACE</code> block for the <code>ApplySmoother_HIP</code> routine. This interface block will define the API for the <code>ApplySmoother_HIP</code> routine and will bind this subroutine to <code>ApplySmoother_HIP</code> defined in <code>smoother_HIP.cpp</code>.</li>
+
+</ol>
+
+<pre><code> INTERFACE
+
+   SUBROUTINE ApplySmoother_HIP(f_dev, weights_dev, smoothF_dev, nW, nX, nY) bind(c,name=&#34;ApplySmoother_HIP&#34;)
+
+     USE ISO_C_BINDING
+
+     IMPLICIT NONE
+
+     TYPE(c_ptr) :: f_dev, weights_dev, smoothF_dev
+
+     INTEGER, VALUE :: nW, nX, nY
+
+   END SUBROUTINE ApplySmoother_HIP
+
+ END INTERFACE</code></pre>
+
+<ol type="1" start="3">
+
+<li>Save your changes in <code>smoother.F90</code> and open <code>main.F90</code>.</li>
+
+<li>Navigate down to the <code>ApplySmoother</code> call in the main iteration loop. Replace this call with a call to <code>ApplySmoother_HIP</code>. Replace the input/output variables with their device versions.</li>
+
+</ol>
+
+<pre><code>CALL ApplySmoother_HIP( f_dev, weights_dev, smoothF_dev, nW, nX, nY )</code></pre>
+
+<ol type="1" start="5">
+
+<li>Save your changes in <code>main.F90</code>.</li>
+
+</ol>
+
+<h2 is-upgraded><strong>Update the Makefile</strong></h2>
+
+<ol type="1" start="1">
+
+<li>Open the <code>Makefile</code>.</li>
+
+<li>Add instructions to compile <code>smoother_HIP.cpp</code> to an object file. Note that you can continue to use <code>hipfc</code> as the compiler since hipfc will detect the <code>.cpp</code> file extension and switch to using <code>hipcc</code> automatically. Notice however, that you can use the <code>CFLAGS</code> variable to pass compilation flags specific to compiling this C++ file.</li>
+
+</ol>
+
+<pre><code>smoother_HIP.o : smoother_HIP.cpp
+
+     $(FC) $(CFLAGS) -c smoother_HIP.cpp  -o $@</code></pre>
+
+<ol type="1" start="3">
+
+<li>Add <code>smoother_HIP.o</code> dependencies on the <code>smoother.o</code> and <code>smoother</code> targets.</li>
+
+</ol>
+
+<pre><code>smoother: main.o smoother.o smoother_HIP.o
+
+    ${FC} ${FFLAGS} *.o -o $@
+
+
+
+main.o : main.F90 smoother.o
+
+    $(FC) $(FFLAGS) -c main.F90  -o $@
+
+
+
+smoother.o : smoother.F90 smoother_HIP.o
+
+    $(FC) $(FFLAGS) -c smoother.F90  -o $@</code></pre>
+
+<ol type="1" start="4">
+
+<li>Save the Makefile and rebuild the application.</li>
+
+</ol>
+
+<aside class="warning"><p><strong>Caution: </strong>In order to obtain bit-for-bit correctness on Nvidia Platforms, you must add the <code>-fmad=false</code> flag to the <code>CFLAGS</code> variable in the Makefile. This flag disables fused multiply-add operations. Fused Multiply-Add (FMA) operations on the GPU result in improved performance but can cause a difference in the computed solution between <code>ApplySmoother</code> and <code>ApplySmoother_HIP</code>.</p>
+
+</aside>
+
+<aside class="special"><p><strong>Tip:</strong> Once you have verified your results, make sure that you commit your changes to your local git repository.</p>
+
+</aside>
+
+<h2 is-upgraded><strong>Next steps</strong></h2>
+
+<p>Congratulations! So far, you&#39;ve learned how to allocate and manage memory on the GPU and how to launch a GPU kernel from Fortran using hipfort, HIP, and ISO C Binding. </p>
+
+<p>Right now, we have the code in a state where, every iteration, data is copied to the GPU before calling <code>ApplySmoother_gpu</code> and from the GPU after calling A<code>pplySmoother_gpu</code>. This situation happens quite often in the early stages of porting to the GPU.</p>
+
+<p>The next step in this codelab is to offload the <code>ResetF</code> routine to the GPU, even though it does not take up a lot of time. We want to offload it to the GPU so that we can move the <code>hipMemcpy</code> calls outside of the iteration loop in main and reduce the number of times data is transmitted across the PCI bus.</p>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Offload the resetF Kernel to the GPU" duration="10">
+
+        <p>In this section, we are going to offload the <code>ResetF</code> routine in <code>smoother.F90</code> to the GPU so that we can migrate <code>hipMemcpy</code> calls outside of the iteration loop in <code>main.F90</code>. By this point, you have worked through the mechanics for porting a routine to the GPU  :</p>
+
+<ol type="1" start="1">
+
+<li>Add a HIP kernel in C++</li>
+
+<li>Add a wrapper routine in C++ to launch the HIP kernel</li>
+
+<li>Add an interface block in Fortran</li>
+
+<li>Replace the subroutine/function call with a call to the wrapper routine</li>
+
+</ol>
+
+<p>In this section, we&#39;ll repeat these steps for the <code>ResetF</code> routine. Additionally, we&#39;ll take an extra step, where we push the <code>hipMemcpy</code> calls outside of the main iteration loop, in order to reduce the number of data transfers between the CPU and GPU.</p>
+
+<h2 is-upgraded><strong>Write the HIP Kernels in C++</strong></h2>
+
+<ol type="1" start="1">
+
+<li>Open <code>smoother_HIP.cpp</code></li>
+
+<li>Add a new routine, <code>ResetF_gpu</code>. This routine needs to be of type <code>__global__</code> so that it can be launched on the GPU (device) from the CPU (host) using <code>hipLaunchKernelGGL</code>.</li>
+
+</ol>
+
+<pre><code>__global__ void ResetF_gpu(real *f_dev, real *smoothF_dev, int nW, int nX, int nY)
+
+{
+
+  size_t i = hipThreadIdx_x + hipBlockIdx_x*hipBlockDim_x + nW;
+
+  size_t j = hipThreadIdx_y + hipBlockIdx_y*hipBlockDim_y + nW;
+
+  int iel = i + nX*j;
+
+  if( i &gt;= nW &amp;&amp; i &lt; nX-nW &amp;&amp; j &gt;= nW &amp;&amp; j&lt; nY-nW){
+
+    f_dev[iel] = smoothF_dev[iel];
+
+  }
+
+}</code></pre>
+
+<ol type="1" start="3">
+
+<li>Next, add a wrapper routine that will launch the HIP kernel. As before, you will want to declare the wrapper routine as <code>extern &#34;C&#34;</code>, so that it can be called from Fortran through ISO C Binding. In this routine, you can calculate the grid and block size for the kernel launch. Here, we&#39;ve set the number of threads in the x and y directions to 16 and calculated the grid dimensions by evenly dividing the x and y extents of the outer loops of the original <code>ResetF</code> routine by 16.</li>
+
+</ol>
+
+<pre><code>extern &#34;C&#34;
+
+{ 
+
+  void ResetF_HIP(real **f_dev, real **smoothF_dev, int nW, int nX, int nY)
+
+  { 
+
+    int threadsPerBlock = 16;
+
+    int gridDimX = (nX-2*nW)/threadsPerBlock + 1;
+
+    int gridDimY = (nY-2*nW)/threadsPerBlock + 1;
+
+
+
+    hipLaunchKernelGGL((ResetF_gpu), dim3(gridDimX,gridDimY,1), dim3(threadsPerBlock,threadsPerBlock,1), 0, 0, *f_dev, *smoothF_dev, nW, nX, nY);
+
+  }
+
+}</code></pre>
+
+<ol type="1" start="4">
+
+<li>Save smoother_HIP.cpp</li>
+
+</ol>
+
+<h2 is-upgraded><strong>Add Calls from Fortran to Launch the HIP Kernel</strong></h2>
+
+<p>As with the <code>ApplySmoother_HIP</code> routine, you will add an INTERFACE block in the <code>smoother.F90</code> module for the <code>ResetF_HIP</code>. Then, in the <code>main.F90</code> program, you will replace the call to <code>ResetF</code> with a call to <code>ResetF_HIP</code>.</p>
+
+<ol type="1" start="1">
+
+<li>Open the <code>smoother.F90</code> module.</li>
+
+<li>Add an <code>INTERFACE</code> block for the <code>ResetF_HIP</code> routine. This interface block will define the API for the <code>ResetF_HIP</code> routine and will bind this subroutine to <code>ResetF_HIP</code> defined in <code>smoother_HIP.cpp</code>.</li>
+
+</ol>
+
+<pre><code> INTERFACE
+
+   SUBROUTINE ResetF_HIP(f_dev, smoothF_dev, nW, nX, nY) bind(c,name=&#34;ResetF_HIP&#34;)
+
+     USE ISO_C_BINDING
+
+     IMPLICIT NONE
+
+     TYPE(c_ptr) :: f_dev, smoothF_dev
+
+     INTEGER, VALUE :: nW, nX, nY
+
+   END SUBROUTINE ResetF_HIP
+
+ END INTERFACE</code></pre>
+
+<ol type="1" start="3">
+
+<li>Save your changes in <code>smoother.F90</code> and open <code>main.F90</code>.</li>
+
+<li>Navigate down to the <code>ResetF</code> call in the main iteration loop. Replace this call with a call to <code>ResetF_HIP</code>. Replace the input/output variables with their device versions.</li>
+
+</ol>
+
+<pre><code>CALL ResetF_HIP( f_dev, smoothF_dev, nW, nX, nY )</code></pre>
+
+<ol type="1" start="5">
+
+<li>With <code>ResetF_HIP</code> in place, we can now move the <code>hipMemcpy</code> calls outside of the main iteration loop. Move the call to copy <code>f</code> to <code>f_dev</code> to just before the do loop. To obtain the correct result, you will also need to add a call to copy <code>smoothF</code> to <code>smoothF_dev</code> before the iteration loop. Then, move the call to copy <code>smoothF_dev</code> to <code>smoothF</code> after the do loop.</li>
+
+</ol>
+
+<pre><code>CALL hipCheck(hipMemcpy(smoothF_dev, c_loc(smoothF), SIZEOF(smoothF), hipMemcpyHostToDevice))
+
+CALL hipCheck(hipMemcpy(f_dev, c_loc(f), SIZEOF(f), hipMemcpyHostToDevice))
+
+DO iter = 1, nIter
+
+  CALL ApplySmoother_HIP( f_dev, weights_dev, smoothF_dev, nW, nX, nY )
+
+  CALL ResetF_HIP( f_dev, smoothF_dev, nW, nX, nY )
+
+ENDDO
+
+CALL hipCheck(hipMemcpy(c_loc(smoothF), smoothF_dev, SIZEOF(smoothF), hipMemcpyDeviceToHost))</code></pre>
+
+<ol type="1" start="6">
+
+<li>Save your changes in <code>main.F90</code>. Rebuild and re-run the smoother application with the same parameters as before. Verify that the solution has remain unchanged.</li>
+
+</ol>
+
+<aside class="special"><p><strong>Tip:</strong> Once you have verified your results, make sure that you commit your changes to your local git repository.</p>
+
+</aside>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+      <google-codelab-step label="Congratulations" duration="0">
+
+        <p>In this codelab, you learned how to port serial CPU-only routines in C to GPUs using HIP. To do this, you created device copies of CPU arrays and learned how to copy data from the CPU to the GPU and vice versa. You also learned how to write HIP kernels and launch them from the host. </p>
+
+<p>In the process of doing this, you practiced a strategy for porting to GPUs that included the following steps to make incremental changes to your own source code :</p>
+
+<ol type="1" start="1">
+
+<li>Profile - Find out the hotspots in your code and understand the dependencies with other routines</li>
+
+<li>Plan - Determine what routine you want to port, what data needs to be present on the GPU, and what data needs to be copied back to the CPU after execution</li>
+
+<li>Implement &amp; Verify - Create the necessary device data, insert the appropriate hipMemcpy calls, write an equivalent GPU kernel, and use hipLaunchKernelGGL to launch the GPU kernel. Run your application&#39;s tests and verify the results are correct. Check with a profiler that the new routine and the necessary hipMemCpy calls are being executed.</li>
+
+<li>Commit - Once you have verified correctness and the expected behavior, commit your changes and start the process over again.</li>
+
+</ol>
+
+<h2 is-upgraded><strong>Further reading</strong></h2>
+
+<ul>
+
+<li><a href="https://rocmdocs.amd.com/en/latest/Programming_Guides/HIP-GUIDE.html" target="_blank">HIP Programming Guide</a></li>
+
+<li><a href="https://rocmdocs.amd.com/en/latest/Programming_Guides/Programming-Guides.html#hip-documentation" target="_blank">HIP Documentation</a></li>
+
+<li><a href="https://rocmdocs.amd.com/en/latest/" target="_blank">About AMD ROCm</a></li>
+
+<li><a href="https://rocm-developer-tools.github.io/HIP/" target="_blank">HIP API Documentation</a></li>
+
+<li><a href="https://docs.nvidia.com/cuda/floating-point/index.html#fused-multiply-add-fma" target="_blank">Fused Multiply-Add on Nvidia hardware</a></li>
+
+</ul>
+
+
+
+
+
+      </google-codelab-step>
+
+    
+
+  </google-codelab>
+
+
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+
+
+
+</body>
+
+</html>
+

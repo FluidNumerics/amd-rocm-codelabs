@@ -769,7 +769,7 @@ $ diff smooth-function.txt reference/function.txt</code></pre>
 
       <google-codelab-step label="Offload Routines to the GPU with OpenMP" duration="20">
 
-        <p>In the <code>smoother2d</code> application, we have seen that the <code>smoothField</code> routine, called by <code>main</code>, takes up the most time. Within the main iteration loop in <code>main.c</code>, the <code>resetF</code> function is called to update the input for <code>smoother2d</code> for the next iteration.</p>
+        <p>In the <code>smoother2d</code> application, we have seen that the <code>smoothField</code> routine, called by <code>main</code>, takes up the most time. Within the main iteration loop in <code>main.cpp</code>, the <code>resetF</code> function is called to update the input for <code>smoother2d</code> for the next iteration.</p>
 
 <p>You will start by offloading both the <code>smoothField</code> and <code>resetF</code> routines to the GPU using OpenMP directives (also called &#34;pragmas&#34;). In this section you will learn how to offload sections of code to the GPU and how to manage GPU data using OpenMP pragmas. </p>
 
@@ -929,7 +929,7 @@ $ diff smooth-function.txt reference/function.txt</code></pre>
 
 <ol type="1" start="1">
 
-<li>Open <code>smoother.c</code> and navigate to the <code>resetF</code> routine. Open an OpenMP <code>target</code> region before the start of the first loop in <code>smoothField</code> and map the necessary map directives to copy <code>smoothF</code> to the GPU and <code>f</code> to and from the GPU.</li>
+<li>Open <code>smoother.cpp</code> and navigate to the <code>resetF</code> routine. Open an OpenMP <code>target</code> region before the start of the first loop in <code>smoothField</code> and map the necessary map directives to copy <code>smoothF</code> to the GPU and <code>f</code> to and from the GPU.</li>
 
 </ol>
 
@@ -1093,11 +1093,11 @@ free(arrayOut);</code></pre>
 
 <h2 is-upgraded><strong>Transition to enter/exit data directives</strong></h2>
 
-<p>In the smoother2d application, we want to explicitly control data movement for <code>f</code>, <code>smoothF</code>, and <code>smoothOperator-&gt;weights</code>. You will work in <code>main.c</code> to insert calls to allocate, update, and deallocate device memory for <code>f</code> and <code>smoothF</code>. To handle <code>smoothOperator-&gt;weights</code>, you will work in <code>smoother.c</code> to allocate, update, and deallocate device memory.</p>
+<p>In the smoother2d application, we want to explicitly control data movement for <code>f</code>, <code>smoothF</code>, and <code>smoothOperator-&gt;weights</code>. You will work in <code>main.cpp</code> to insert calls to allocate, update, and deallocate device memory for <code>f</code> and <code>smoothF</code>. To handle <code>smoothOperator-&gt;weights</code>, you will work in <code>smoother.cpp</code> to allocate, update, and deallocate device memory.</p>
 
 <ol type="1" start="1">
 
-<li>Open main.c and find where <code>f</code> and <code>smoothF</code> are allocated memory. Just after the <code>malloc</code> calls, add a <code>target enter data</code> directive to allocate device memory for <code>f</code> and smoothF.</li>
+<li>Open main.cppand find where <code>f</code> and <code>smoothF</code> are allocated memory. Just after the <code>malloc</code> calls, add a <code>target enter data</code> directive to allocate device memory for <code>f</code> and smoothF.</li>
 
 </ol>
 
@@ -1137,7 +1137,7 @@ free(arrayOut);</code></pre>
 
 <ol type="1" start="3">
 
-<li>Add a <code>target exit data</code> directive to deallocate device memory held by <code>f</code> and smoothF before calling <code>free</code> at the end of <code>main.c</code>.</li>
+<li>Add a <code>target exit data</code> directive to deallocate device memory held by <code>f</code> and smoothF before calling <code>free</code> at the end of <code>main.cpp</code>.</li>
 
 </ol>
 
@@ -1151,7 +1151,7 @@ free(arrayOut);</code></pre>
 
 <ol type="1" start="4">
 
-<li>Save <code>main.c</code> and open <code>smoother.c</code>. In the <code>smootherInit</code> routine, add a <code>target enter data</code> directive to allocate device memory for <code>smoothOperator-&gt;weights</code>.</li>
+<li>Save <code>main.cpp</code> and open <code>smoother.cpp</code>. In the <code>smootherInit</code> routine, add a <code>target enter data</code> directive to allocate device memory for <code>smoothOperator-&gt;weights</code>.</li>
 
 </ol>
 

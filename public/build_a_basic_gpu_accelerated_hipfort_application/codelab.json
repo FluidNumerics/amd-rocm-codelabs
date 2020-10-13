@@ -3,13 +3,13 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2020-10-13T01:49:56Z",
+  "updated": "2020-10-13T01:51:03Z",
   "id": "URL",
   "duration": 75,
-  "title": "Building a basic GPU accelerated application with HIP in C/C++",
+  "title": "Building a basic GPU accelerated application with HIP in Fortran",
   "authors": "Joseph Schoonover",
-  "summary": "This codelab will walk you through the basics of CPU and GPU memory management and GPU kernel launching with HIP in C/C++",
-  "source": "1GYt1m-GJx1M9VFVIeOT90XbXKACoUhT1wu94jGc_9NY",
+  "summary": "This codelab will walk you through the basics of CPU and GPU memory management and GPU kernel launching with HIP/hipfort in Fortran.",
+  "source": "1Iy-qrSqMFH-SFhwkFcd_SDzXbajunm3lozHTs2nc9RA",
   "theme": "hpc",
   "status": [
     "draft"
