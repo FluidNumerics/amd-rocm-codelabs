@@ -1615,7 +1615,7 @@ CALL hipCheck(hipMemcpy(c_loc(smoothF), smoothF_dev, SIZEOF(smoothF), hipMemcpyD
 
       <google-codelab-step label="Congratulations" duration="0">
 
-        <p>In this codelab, you learned how to port serial CPU-only routines in C to GPUs using HIP. To do this, you created device copies of CPU arrays and learned how to copy data from the CPU to the GPU and vice versa. You also learned how to write HIP kernels and launch them from the host. </p>
+        <p>In this codelab, you learned how to port serial CPU-only routines in Fortran to GPUs using <a href="https://github.com/ROCmSoftwarePlatform/hipfort" target="_blank">hipfort</a>, HIP, and ISO C Binding. To do this, you used <code>C_PTR</code> in Fortran to create device copies of CPU arrays and learned how to copy data from the CPU to the GPU and vice versa with <code>hipMemcpy</code>. You also learned how to write HIP kernels in C++, expose them to Fortran, and launch them from the host within Fortran source code. </p>
 
 <p>In the process of doing this, you practiced a strategy for porting to GPUs that included the following steps to make incremental changes to your own source code :</p>
 
