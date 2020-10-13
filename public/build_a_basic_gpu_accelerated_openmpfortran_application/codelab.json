@@ -3,13 +3,13 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2020-10-13T20:20:12Z",
+  "updated": "2020-10-13T20:27:28Z",
   "id": "URL",
   "duration": 65,
-  "title": "Building a basic GPU accelerated application with OpenMP in C/C++",
+  "title": "Building a basic GPU accelerated application with OpenMP in Fortran",
   "authors": "Joseph Schoonover",
-  "summary": "This codelab will walk you through the basics of CPU and GPU memory management and GPU kernel launching with OpenMP in C/C++ for both AMD and Nvidia GPUs.",
-  "source": "15W_7Z1BMyMXmqjXYZ2flVmm1evvTA4fEzkihFBZ3jEc",
+  "summary": "This codelab will walk you through the basics of CPU and GPU memory management and GPU kernel launching with OpenMP in Fortran for both AMD and Nvidia GPUs.",
+  "source": "1Fz77DoUmUzUCOh1QWU42OPyv-cey38rpjpcGDV7D-48",
   "theme": "hpc",
   "status": [
     "draft"

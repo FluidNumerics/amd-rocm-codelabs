@@ -363,9 +363,7 @@
 
 <li>Process command line arguments</li>
 
-<li>Allocate memory for smoother class - 5x5 stencil with Gaussian weights</li>
-
-<li>Allocate memory for function and smoothed function</li>
+<li>Allocate memory for smoother weights (Gaussian), a function, and the smoothed function</li>
 
 <li>Initialize function on CPU and report function to file</li>
 
@@ -383,9 +381,9 @@
 
 <ol type="1" start="1">
 
-<li>smoother.cpp : Defines a simple data structure that stores the smoothing operators weights and the routines for allocating memory, deallocating memory, and executing the smoothing operation.</li>
+<li>smoother.F90 : A module that defines the routines needed to apply the smoothing operation and update the function with each iterate.</li>
 
-<li>main.cpp : Defines the main program that sets up the 2-D field to be smoothed and managed file IO.</li>
+<li>main.F90 : Defines the main program that sets up the 2-D field to be smoothed and managed file IO.</li>
 
 <li>makefile : A simple makefile is to build the application binary <code>smoother</code>.</li>
 
@@ -411,7 +409,7 @@
 
 </ol>
 
-<pre><code>$ cd amd-codelab-demos/code/smoother_fortran/src
+<pre><code>$ cd amd-codelab-demos/code/fortran/smoother/src
 
 $ make</code></pre>
 
@@ -523,7 +521,7 @@ $ source env/bin/activate</code></pre>
 
  time   seconds   seconds    calls   s/call   s/call  name    
 
- 97.67     11.50    11.50      100     0.11     0.11  __smoother_MOD_applysmoother
+ 97.67     11.50    11.50      100     0.11     0.11  __smoother_MOD_ApplySmoother
 
   2.30     11.77     0.27      100     0.00     0.00  __smoother_MOD_resetf
 
@@ -535,7 +533,7 @@ $ source env/bin/activate</code></pre>
 
 <p>Let&#39;s now take a look at at the call tree. This call tree has five entries, one for each routine in our program. The right-most field for each entry indicates the routines that called each routine and that are called by each routine. </p>
 
-<p>For <code>smoother</code>, the first entry shows that main calls <code>applySmoother</code>, <code>resetF</code>, and <code>getCLIConf</code>. Further, the called column indicates that applySmoother and resetF routines are shown to be called 100 times (in this case) by main. The self and children columns indicate that main spends 0.02s executing instructions in main and 11.77s in calling other routines. Further, of those 11.77s, 11.50s are spent in <code>applySmoother</code> and 0.27 are spent in <code>resetF</code>. </p>
+<p>For <code>smoother</code>, the first entry shows that main calls <code>ApplySmoother</code>, <code>resetF</code>, and <code>getCLIConf</code>. Further, the called column indicates that ApplySmoother and resetF routines are shown to be called 100 times (in this case) by main. The self and children columns indicate that main spends 0.02s executing instructions in main and 11.77s in calling other routines. Further, of those 11.77s, 11.50s are spent in <code>ApplySmoother</code> and 0.27 are spent in <code>resetF</code>. </p>
 
 <pre><code>index % time    self  children    called     name
 
@@ -543,7 +541,7 @@ $ source env/bin/activate</code></pre>
 
 [1]    100.0    0.02   11.77       1         MAIN__ [1]
 
-               11.50    0.00     100/100         __smoother_MOD_applysmoother [3]
+               11.50    0.00     100/100         __smoother_MOD_ApplySmoother [3]
 
                 0.27    0.00     100/100         __smoother_MOD_resetf [4]
 
@@ -561,7 +559,7 @@ $ source env/bin/activate</code></pre>
 
                11.50    0.00     100/100         MAIN__ [1]
 
-[3]     97.5   11.50    0.00     100         __smoother_MOD_applysmoother [3]
+[3]     97.5   11.50    0.00     100         __smoother_MOD_ApplySmoother [3]
 
 -----------------------------------------------
 
@@ -591,9 +589,9 @@ $ source env/bin/activate</code></pre>
 
 <h3 is-upgraded><strong>Next steps</strong></h3>
 
-<p>Now that we have a profile and an understanding of the call structure of the application, we can now plan our port to GPUs. First, we will focus on porting the applySmoother routine and the necessary data to the GPU, since applySmoother takes up the majority of the run time. </p>
+<p>Now that we have a profile and an understanding of the call structure of the application, we can now plan our port to GPUs. First, we will focus on porting the ApplySmoother routine and the necessary data to the GPU, since ApplySmoother takes up the majority of the run time. </p>
 
-<p>When we port this routine, we will introduce data allocation on the GPU and data copies between CPU and GPU. This data movement may potentially increase the overall application runtime, even if the applySmoother routine performs better. In this event, we will then work on minimizing data movements between CPU and GPU. </p>
+<p>When we port this routine, we will introduce data allocation on the GPU and data copies between CPU and GPU. This data movement may potentially increase the overall application runtime, even if the ApplySmoother routine performs better. In this event, we will then work on minimizing data movements between CPU and GPU. </p>
 
 <aside class="special"><p class="image-container"><img style="width: 231.82px" src="img/fb9a02e8f06a74cb.png"></p>
 
@@ -615,7 +613,7 @@ $ source env/bin/activate</code></pre>
 
 </aside>
 
-<p>In the <code>smoother</code> application, we have seen that the <code>applySmoother</code> routine, called by <code>main</code>, takes up the most time. Looking at the main iteration loop in lines 51-56 in <code>main.F90</code> and the <code>applySmoother</code> function in <code>smoother.F90</code>, we see that this function takes in arrays  <code>f</code> and <code>weights</code> and integers <code>nW</code>, <code>nX</code>, and <code>nY</code>. Each call to <code>ApplySmoother</code> returns the <code>smoothF</code> array.</p>
+<p>In the <code>smoother</code> application, we have seen that the <code>ApplySmoother</code> routine, called by <code>main</code>, takes up the most time. Looking at the main iteration loop in lines 51-56 in <code>main.F90</code> and the <code>ApplySmoother</code> function in <code>smoother.F90</code>, we see that this function takes in arrays  <code>f</code> and <code>weights</code> and integers <code>nW</code>, <code>nX</code>, and <code>nY</code>. Each call to <code>ApplySmoother</code> returns the <code>smoothF</code> array.</p>
 
 <pre><code> 51     DO iter = 1, nIter
 
@@ -629,7 +627,7 @@ $ source env/bin/activate</code></pre>
 
  56     ENDDO</code></pre>
 
-<p>In order to offload <code>applySmoother</code> to the GPU, we will need to copy the <code>f</code> and <code>weights</code> arrays to the GPU. After calling <code>smoothF</code>, we will want to copy <code>smoothF</code> back to the CPU before calling <code>resetF</code>.</p>
+<p>In order to offload <code>ApplySmoother</code> to the GPU, we will need to copy the <code>f</code> and <code>weights</code> arrays to the GPU. After calling <code>smoothF</code>, we will want to copy <code>smoothF</code> back to the CPU before calling <code>resetF</code>.</p>
 
 <h2 is-upgraded><strong>Saving Reference Output</strong></h2>
 
@@ -827,7 +825,7 @@ No kernels were profiled.
 
 <p>So far, you have a code that has both CPU (host) and GPU (device) memory. You are now ready to make calls to transfer data between the host and device. </p>
 
-<p>Recall from the first section of this codelab that the <code>applySmoother</code> routine is the most expensive routine. Because of this we&#39;ll start by focusing on moving necessary to the GPU before the call to <code>applySmoother</code>, and moving data from the GPU after.</p>
+<p>Recall from the first section of this codelab that the <code>ApplySmoother</code> routine is the most expensive routine. Because of this we&#39;ll start by focusing on moving necessary to the GPU before the call to <code>ApplySmoother</code>, and moving data from the GPU after.</p>
 
 <p>To copy data to the GPU (Host To Device), you will use <code>hipMemcpy</code>, e.g.</p>
 
@@ -849,7 +847,7 @@ No kernels were profiled.
 
 <ol type="1" start="2">
 
-<li>Just before the call to applySmoother, inside the iteration loop, insert calls to hipMemcpy wrapped inside the hipCheck routine to copy f to f_dev.</li>
+<li>Just before the call to ApplySmoother, inside the iteration loop, insert calls to hipMemcpy wrapped inside the hipCheck routine to copy f to f_dev.</li>
 
 </ol>
 
@@ -863,7 +861,7 @@ No kernels were profiled.
 
 <ol type="1" start="3">
 
-<li>When we first port the applySmoother routine to the GPU, we will leave resetF on the CPU. Because of this, we will need to have smoothF copied back to the CPU before calling resetF. Now, just after the call to applySmoother and before the call to resetF, insert a call to hipMemcpy wrapped inside the hipCheck routine to copy smoothF_dev from the device to the host.</li>
+<li>When we first port the ApplySmoother routine to the GPU, we will leave resetF on the CPU. Because of this, we will need to have smoothF copied back to the CPU before calling resetF. Now, just after the call to ApplySmoother and before the call to resetF, insert a call to hipMemcpy wrapped inside the hipCheck routine to copy smoothF_dev from the device to the host.</li>
 
 </ol>
 
@@ -941,13 +939,13 @@ hipFree,3,192359,64119,0.02761722601411495</code></pre>
 
 </code></pre>
 
-<aside class="warning"><p><strong>Caution: </strong>Copying smoothF_dev to <code>smoothF</code> will produce an incorrect result until the <code>applySmoother</code> routine is offloaded to the GPU, which we will complete in the next section. This happens because <code>smoothF_dev</code> currently contains uninitialized data that we use to update <code>smoothF</code>.</p>
+<aside class="warning"><p><strong>Caution: </strong>Copying smoothF_dev to <code>smoothF</code> will produce an incorrect result until the <code>ApplySmoother</code> routine is offloaded to the GPU, which we will complete in the next section. This happens because <code>smoothF_dev</code> currently contains uninitialized data that we use to update <code>smoothF</code>.</p>
 
 </aside>
 
 <h2 is-upgraded><strong>Next steps</strong></h2>
 
-<p>At this point, you now have the necessary data declared on the GPU. Additionally, you used hipMemcpy to make the input to applySmoother available on the GPU. In the next step, you will create a HIP kernel that will run the applySmoother algorithm on the GPU and replace the call to applySmoother with a call to launch this kernel.</p>
+<p>At this point, you now have the necessary data declared on the GPU. Additionally, you used hipMemcpy to make the input to ApplySmoother available on the GPU. In the next step, you will create a HIP kernel that will run the ApplySmoother algorithm on the GPU and replace the call to ApplySmoother with a call to launch this kernel.</p>
 
 
 
@@ -1131,7 +1129,7 @@ END INTERFACE</code></pre>
 
 <p>Once these three components are defined, you can then launch the GPU accelerated kernel from Fortran by simply calling <code>VecAdd_HIPWrapper</code>.</p>
 
-<p>In the next section of this codelab, you will use these three steps to offload the applySmoother routine to the GPU.</p>
+<p>In the next section of this codelab, you will use these three steps to offload the ApplySmoother routine to the GPU.</p>
 
 
 
@@ -1193,7 +1191,7 @@ END SUBROUTINE ApplySmoother</code></pre>
 
 <p>The outer loops, over i and j, are tightly nested loops over a 2-D grid. The size of these loops are nY-2*nW and nX-2*nW. The values of nX and nY are determined by the user through the first two command line arguments (we have been using 1000 for), and <code>nW</code> is 2 (see the declarations in <code>main.F90</code>). Within the i and j loops, we carry out a reduction operation for smLocal and then assign the value to each element of smoothF.</p>
 
-<p>In the applySmoother algorithm, the order in which we execute the i and j loops does not matter. Further, the size of each loop is O(1000) for the example we&#39;re working with. A good strategy for offloading this routine to the GPU is to have each GPU thread execute the instructions within the i and j loops. Ideally, then we want each thread to execute something the following</p>
+<p>In the ApplySmoother algorithm, the order in which we execute the i and j loops does not matter. Further, the size of each loop is O(1000) for the example we&#39;re working with. A good strategy for offloading this routine to the GPU is to have each GPU thread execute the instructions within the i and j loops. Ideally, then we want each thread to execute something the following</p>
 
 <pre><code>    real smLocal = 0.0;
 
@@ -1321,7 +1319,7 @@ END SUBROUTINE ApplySmoother</code></pre>
 
 <ol type="1" start="4">
 
-<li>Next, add a wrapper routine in <code>smoother_HIP.cpp</code> that will launch the HIP kernel. Additionally, you will want to declare the wrapper routine as <code>extern &#34;C&#34;</code>, so that it can be called from Fortran through ISO C Binding. In this routine, you can calculate the grid and block size for the kernel launch. Here, we&#39;ve set the number of threads in the x and y directions to 16 and calculated the grid dimensions by evenly dividing the x and y extents of the outer loops of the original <code>applySmoother</code> routine by 16.</li>
+<li>Next, add a wrapper routine in <code>smoother_HIP.cpp</code> that will launch the HIP kernel. Additionally, you will want to declare the wrapper routine as <code>extern &#34;C&#34;</code>, so that it can be called from Fortran through ISO C Binding. In this routine, you can calculate the grid and block size for the kernel launch. Here, we&#39;ve set the number of threads in the x and y directions to 16 and calculated the grid dimensions by evenly dividing the x and y extents of the outer loops of the original <code>ApplySmoother</code> routine by 16.</li>
 
 </ol>
 
@@ -1341,7 +1339,7 @@ END SUBROUTINE ApplySmoother</code></pre>
 
      
 
-    hipLaunchKernelGGL((applySmoother_gpu), dim3(gridDimX,gridDimY,1), dim3(threadsPerBlock,threadsPerBlock,1), 0, 0, *weights_dev, *f_dev, *smoothF_dev, nX, nY, nW);
+    hipLaunchKernelGGL((ApplySmoother_gpu), dim3(gridDimX,gridDimY,1), dim3(threadsPerBlock,threadsPerBlock,1), 0, 0, *weights_dev, *f_dev, *smoothF_dev, nX, nY, nW);
 
   } 
 
@@ -1434,6 +1432,18 @@ smoother.o : smoother.F90 smoother_HIP.o
 </ol>
 
 <aside class="warning"><p><strong>Caution: </strong>In order to obtain bit-for-bit correctness on Nvidia Platforms, you must add the <code>-fmad=false</code> flag to the <code>CFLAGS</code> variable in the Makefile. This flag disables fused multiply-add operations. Fused Multiply-Add (FMA) operations on the GPU result in improved performance but can cause a difference in the computed solution between <code>ApplySmoother</code> and <code>ApplySmoother_HIP</code>.</p>
+
+</aside>
+
+<h2 is-upgraded><strong>Profile the application</strong></h2>
+
+<p>You can verify that data is allocated on the GPU and that data is copied from the CPU to GPU by using a profiler.<br><br>To profile, use <code>rocprof</code> with the <code>--hip-trace on</code> and <code>--stats</code> flags. Running <code>rocprof</code> will create a file called <code>results.json</code> that contains the data for a trace profile. Additionally, <code>results.stats.csv</code> and <code>results.hip-stats.csv</code> will contain hotspot analysis for HIP kernels and HIP API calls, respectively.</p>
+
+<pre><code>$ rocprof --stats ./smoother 1000 1000 100</code></pre>
+
+<aside class="special"><p><strong>Tip:</strong> You can use <a href="https://www.chromium.org/developers/how-tos/trace-event-profiling-tool" target="_blank">Google Chrome Tracing</a> to visualize the results.json trace profile. Simply open the Google Chrome web browser and navigate to chrome://tracing and upload results.json. </p>
+
+<p class="image-container"><img style="width: 610.00px" src="img/3682f6a6d97594e4.png"></p>
 
 </aside>
 

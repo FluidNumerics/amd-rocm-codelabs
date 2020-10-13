@@ -385,9 +385,9 @@
 
 <li>main.cpp : Defines the main program that sets up the 2-D field to be smoothed and managed file IO.</li>
 
-<li>makefile : A simple makefile is to build the application binary <code>smoother2d</code>.</li>
+<li>makefile : A simple makefile is to build the application binary <code>smoother</code>.</li>
 
-<li>viz.py : A python script for creating plots of the smoother2d output</li>
+<li>viz.py : A python script for creating plots of the smoother output</li>
 
 </ol>
 
@@ -405,11 +405,11 @@
 
 <ol type="1" start="2">
 
-<li>Build the smoother2d application. Keep in mind, the compiler is set to gcc by default in the provided makefile.</li>
+<li>Build the smoother application. Keep in mind, the compiler is set to gcc by default in the provided makefile.</li>
 
 </ol>
 
-<pre><code>$ cd amd-codelab-demos/code/smoothing2d/src
+<pre><code>$ cd amd-codelab-demos/c++/smoother/src
 
 $ make</code></pre>
 
@@ -419,7 +419,7 @@ $ make</code></pre>
 
 </ol>
 
-<p>$ ./smoother2d 1000 100</p>
+<p>$ ./smoother 1000 100</p>
 
 <h2 is-upgraded><strong>Visualize the output (Optional)</strong></h2>
 
@@ -451,7 +451,7 @@ $ source env/bin/activate</code></pre>
 
 <pre><code>(env)$ python3 ./viz.py</code></pre>
 
-<p>This script saves a figure to <code>function.eps</code>. This figure shows the initial 2-D function before smoothing on the top and the smoothed field on the bottom. An example of the visualized output from the <code>smoother2d</code> example program is shown in the image below for a grid with 100x100 cells. The initial field is shown on the top, and the smoothed field is shown on the bottom after 100 iterations. Increasing the number of iterations (the second argument) will enhance the amount of smoothing and will further blur the image.<img style="width: 624.00px" src="img/36a5cdd828d91bbd.png"></p>
+<p>This script saves a figure to <code>function.eps</code>. This figure shows the initial 2-D function before smoothing on the top and the smoothed field on the bottom. An example of the visualized output from the <code>smoother</code> example program is shown in the image below for a grid with 100x100 cells. The initial field is shown on the top, and the smoothed field is shown on the bottom after 100 iterations. Increasing the number of iterations (the second argument) will enhance the amount of smoothing and will further blur the image.<img style="width: 624.00px" src="img/36a5cdd828d91bbd.png"></p>
 
 <h2 is-upgraded><strong>Profile the Application</strong></h2>
 
@@ -485,7 +485,7 @@ $ source env/bin/activate</code></pre>
 
 <ol type="1" start="3">
 
-<li>Make the smoother2d application</li>
+<li>Make the smoother application</li>
 
 </ol>
 
@@ -497,7 +497,7 @@ $ source env/bin/activate</code></pre>
 
 </ol>
 
-<pre><code>$ ./smoother2d 1000 10</code></pre>
+<pre><code>$ ./smoother 1000 10</code></pre>
 
 <ol type="1" start="5">
 
@@ -505,7 +505,7 @@ $ source env/bin/activate</code></pre>
 
 </ol>
 
-<pre><code>$ gprof ./smoother2d gmon.out &gt; profile.txt</code></pre>
+<pre><code>$ gprof ./smoother gmon.out &gt; profile.txt</code></pre>
 
 <aside class="special"><p><strong>Tip:</strong> If you are working with compilers other than GNU compilers, you can use <a href="https://developer.mantidproject.org/ProfilingWithValgrind.html" target="_blank">Valgrind&#39;s Callgrind</a> command line tool to create call-graphs and to conduct hotspot analysis.</p>
 
@@ -515,7 +515,7 @@ $ source env/bin/activate</code></pre>
 
 <p><code>gprof</code> provides a flat profile and a summary of your application&#39;s call structure indicating dependencies within your source code as a call graph. A <strong><em>call tree</em></strong> depicts the relationships between routines in your source code. Combining timing information with a call graph will help you plan the order in which you port routines to the GPU.</p>
 
-<p>The first section of the gprof output is the flat-profile. An example flat-profile for the <code>smoother2d</code> application is given below. The flat-profile provides a list of routines in your application, ordered by the percent time your program spends within those routines from greatest to least. Beneath the flat-profile, gprof provides documentation of each of the columns for your convenience.</p>
+<p>The first section of the gprof output is the flat-profile. An example flat-profile for the <code>smoother</code> application is given below. The flat-profile provides a list of routines in your application, ordered by the percent time your program spends within those routines from greatest to least. Beneath the flat-profile, gprof provides documentation of each of the columns for your convenience.</p>
 
 <pre><code>  %   cumulative   self              self     total           
 
@@ -533,7 +533,7 @@ $ source env/bin/activate</code></pre>
 
 <p>Let&#39;s now take a look at at the call tree. This call tree has five entries, one for each routine in our program. The right-most field for each entry indicates the routines that called each routine and that are called by each routine. </p>
 
-<p>For <code>smoother2d</code>, the first entry shows that main calls <code>smoothField</code>, <code>resetF</code>, <code>smootherInit</code>, and <code>smootherFree</code>. Further, the called column indicates that smoothField and resetF routines are shown to be called 10 times (in this case) by main. The self and children columns indicate that main spends 0.03s executing instructions in main and 1.19s in calling other routines. Further, of those 1.19s, 1.16s are spent in <code>smoothField</code> and 0.03 are spent in <code>resetF</code>. </p>
+<p>For <code>smoother</code>, the first entry shows that main calls <code>smoothField</code>, <code>resetF</code>, <code>smootherInit</code>, and <code>smootherFree</code>. Further, the called column indicates that smoothField and resetF routines are shown to be called 10 times (in this case) by main. The self and children columns indicate that main spends 0.03s executing instructions in main and 1.19s in calling other routines. Further, of those 1.19s, 1.16s are spent in <code>smoothField</code> and 0.03 are spent in <code>resetF</code>. </p>
 
 <pre><code>index % time    self  children    called     name
 
@@ -605,7 +605,7 @@ $ source env/bin/activate</code></pre>
 
 </aside>
 
-<p>In the <code>smoother2d</code> application, we have seen that the <code>smoothField</code> routine, called by <code>main</code>, takes up the most time. Looking at the function call in <code>main.cpp</code> and the <code>smoothField</code> routine in <code>smoother.cpp</code>, we see that this routine takes in a <code>smoother</code> object, a real array pointer <code>f</code>, and integers <code>nx</code> and <code>ny</code> that are passed by value.</p>
+<p>In the <code>smoother</code> application, we have seen that the <code>smoothField</code> routine, called by <code>main</code>, takes up the most time. Looking at the function call in <code>main.cpp</code> and the <code>smoothField</code> routine in <code>smoother.cpp</code>, we see that this routine takes in a <code>smoother</code> object, a real array pointer <code>f</code>, and integers <code>nx</code> and <code>ny</code> that are passed by value.</p>
 
 <pre><code> 81   for( int iter=0; iter&lt;nIter; iter++){
 
@@ -709,7 +709,7 @@ LFLAGS=-lm</code></pre>
 
 </aside>
 
-<p>Once you have completed the code and Makefile modifications, you can now compile <code>smoother2d</code> and verify that data allocated and copied to the GPU.</p>
+<p>Once you have completed the code and Makefile modifications, you can now compile <code>smoother</code> and verify that data allocated and copied to the GPU.</p>
 
 <ol type="1" start="1">
 
@@ -723,19 +723,19 @@ $ mv function.txt smooth-function.txt ./reference/</code></pre>
 
 <ol type="1" start="2">
 
-<li>Remove the <code>*.o</code> files and the <code>smoother2d</code> binary to ensure a clean build and make a new <code>smoother2d</code> binary</li>
+<li>Remove the <code>*.o</code> files and the <code>smoother</code> binary to ensure a clean build and make a new <code>smoother</code> binary</li>
 
 </ol>
 
-<pre><code>$ make clean &amp;&amp; make smoother2d</code></pre>
+<pre><code>$ make clean &amp;&amp; make smoother</code></pre>
 
 <ol type="1" start="3">
 
-<li>Run <code>smoother2d</code> with the same input parameters as you did in the previous section and verify the output is unchanged. We use the diff command line utility to compare the output files and the reference files. If there are no differences, diff will produce no output.</li>
+<li>Run <code>smoother</code> with the same input parameters as you did in the previous section and verify the output is unchanged. We use the diff command line utility to compare the output files and the reference files. If there are no differences, diff will produce no output.</li>
 
 </ol>
 
-<pre><code>$ ./smoother2d 1000 10
+<pre><code>$ ./smoother 1000 10
 
 $ diff function.txt reference/function.txt
 
@@ -743,11 +743,13 @@ $ diff smooth-function.txt reference.txt</code></pre>
 
 <ol type="1" start="4">
 
-<li>Verify that data is allocated on the GPU and that data is copied from the CPU to GPU by using a profiler.<br><br>For AMD platforms, use <code>rocprof</code> with the <code>--hip-trace</code> flag. Running rocprof will create a file called <code>profile.json</code>. The contents of <code>results.hip_stats.csv</code> will show a summary of calls to <code>hipMalloc</code>, <code>hipMemcpy</code>, and <code>hipFree</code>.<br></li>
+<li>Verify that data is allocated on the GPU and that data is copied from the CPU to GPU by using a profiler.<br><br>To profile, use <code>rocprof</code> with the <code>--hip-trace on</code> and <code>--stats</code> flags. Running <code>rocprof</code> will create a file called <code>results.json</code> that contains the data for a trace profile. Additionally, <code>results.stats.csv</code> and <code>results.hip-stats.csv</code> will contain hotspot analysis for HIP kernels and HIP API calls, respectively.<br></li>
 
 </ol>
 
-<pre><code>&#34;Name&#34;,&#34;Calls&#34;,&#34;TotalDurationNs&#34;,&#34;AverageNs&#34;,&#34;Percentage&#34;
+<pre><code>$ rocprof --hip-trace --stats ./smoother 1000 10
+
+&#34;Name&#34;,&#34;Calls&#34;,&#34;TotalDurationNs&#34;,&#34;AverageNs&#34;,&#34;Percentage&#34;
 
 hipMemcpy,1,12503928,12503928,95.8586582624
 
@@ -755,39 +757,11 @@ hipMalloc,3,387867,129289,2.9734984242
 
 hipFree,3,152335,50778,1.16784331343</code></pre>
 
-<p><br>For Nvidia platforms, use <code>nvprof</code>. When running on Nvidia platforms, you can expect to see calls to <code>cudaMalloc</code>, <code>cudaMemcpy</code>, and <code>cudaFree</code>.</p>
+<aside class="special"><p><strong>Tip:</strong> You can use <a href="https://www.chromium.org/developers/how-tos/trace-event-profiling-tool" target="_blank">Google Chrome Tracing</a> to visualize the results.json trace profile. Simply open the Google Chrome web browser and navigate to chrome://tracing and upload results.json. </p>
 
-<pre><code>$ nvprof ./smoother2d 1000 10
+<p class="image-container"><img style="width: 610.00px" src="img/3682f6a6d97594e4.png"></p>
 
-==8725== NVPROF is profiling process 8725, command: ./smoother2d 1000 10
-
-==8725== Profiling application: ./smoother2d 1000 10
-
-==8725== Profiling result:
-
-            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
-
- GPU activities:  100.00%  1.4400us         1  1.4400us  1.4400us  1.4400us  [CUDA memcpy HtoD]
-
-      API calls:   99.56%  174.39ms         1  174.39ms  174.39ms  174.39ms  cudaMalloc
-
-                    0.22%  381.82us        97  3.9360us     172ns  224.16us  cuDeviceGetAttribute
-
-                    0.12%  207.16us         1  207.16us  207.16us  207.16us  cuDeviceTotalMem
-
-                    0.09%  159.58us         1  159.58us  159.58us  159.58us  cuDeviceGetName
-
-                    0.01%  13.386us         1  13.386us  13.386us  13.386us  cudaMemcpy
-
-                    0.01%  10.374us         1  10.374us  10.374us  10.374us  cudaFree
-
-                    0.00%  3.8930us         1  3.8930us  3.8930us  3.8930us  cuDeviceGetPCIBusId
-
-                    0.00%  1.7600us         3     586ns     247ns  1.2440us  cuDeviceGetCount
-
-                    0.00%     753ns         2     376ns     235ns     518ns  cuDeviceGet
-
-                    0.00%     282ns         1     282ns     282ns     282ns  cuDeviceGetUuid</code></pre>
+</aside>
 
 <ol type="1" start="5">
 
@@ -901,11 +875,11 @@ hipFree,3,173225,57741,0.393127872872</code></pre>
 
 <p><br>For Nvidia platforms, use <code>nvprof</code>. At this stage, you should see three calls to <code>cudaMalloc</code>, three calls to <code>cudaFree</code>, ten calls to <code>cudaMemcpy (Device to Host)</code>, and 11 calls to <code>cudaMemcpy (Host to Device)</code>.</p>
 
-<pre><code>$ nvprof ./smoother2d 1000 10
+<pre><code>$ nvprof ./smoother 1000 10
 
-==23287== NVPROF is profiling process 23287, command: ./smoother2d 1000 10
+==23287== NVPROF is profiling process 23287, command: ./smoother 1000 10
 
-==23287== Profiling application: ./smoother2d 1000 10
+==23287== Profiling application: ./smoother 1000 10
 
 ==23287== Profiling result:
 
@@ -1269,7 +1243,7 @@ hipFree,3,173225,57741,0.393127872872</code></pre>
 
 </ol>
 
-<pre><code>$ ./smoother2d 1000 10
+<pre><code>$ ./smoother 1000 10
 
 $ diff function.txt reference/function.txt
 
@@ -1309,11 +1283,11 @@ hipFree,3,300215,100071,0.0872907081227</code></pre>
 
 </ol>
 
-<pre><code>$ nvprof ./smoother2d 1000 10
+<pre><code>$ nvprof ./smoother 1000 10
 
-==9394== NVPROF is profiling process 9394, command: ./smoother2d 1000 10
+==9394== NVPROF is profiling process 9394, command: ./smoother 1000 10
 
-==9394== Profiling application: ./smoother2d 1000 10
+==9394== Profiling application: ./smoother 1000 10
 
 ==9394== Profiling result:
 
@@ -1443,7 +1417,7 @@ hipFree,3,300215,100071,0.0872907081227</code></pre>
 
 <ol type="1" start="5">
 
-<li>Recompile the smoother2d application</li>
+<li>Recompile the smoother application</li>
 
 </ol>
 
@@ -1455,7 +1429,7 @@ hipFree,3,300215,100071,0.0872907081227</code></pre>
 
 </ol>
 
-<pre><code>$ ./smoother2d 1000 10
+<pre><code>$ ./smoother 1000 10
 
 $ diff function.txt reference/function.txt
 
@@ -1489,11 +1463,11 @@ hipFree,3,143194,47731,0.0460560801107</code></pre>
 
 </ol>
 
-<pre><code>$ nvprof ./smoother2d 1000 10
+<pre><code>$ nvprof ./smoother 1000 10
 
-==5017== NVPROF is profiling process 5017, command: ./smoother2d 1000 10
+==5017== NVPROF is profiling process 5017, command: ./smoother 1000 10
 
-==5017== Profiling application: ./smoother2d 1000 10
+==5017== Profiling application: ./smoother 1000 10
 
 ==5017== Profiling result:
 
