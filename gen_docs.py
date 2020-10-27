@@ -27,7 +27,7 @@ index='''
 <body>
 
 	<div class="fluid_sidebar">
-		<h1><a href="https://www.fluidnumerics.com">Fluid Numerics</a></h1>
+		<h1><a href="https://www.oshackathon.com">OS Hackathon</a></h1>
 	</div>
 
 	<div class="fluid_header">
@@ -38,14 +38,14 @@ index='''
 
 	<div class="fluid_body">
 
-	    <h2><a href="https://www.fluidnumerics.com">Head back to Fluid Numerics</a></h2>
+	    <h2><a href="https://www.oshackathon.com">Head back to OS Hackathon</a></h2>
             [BODY]
 
         </div>
 
         <div class="fluid_footer">
             <h2>Let us know if we can do anything to improve these codelabs!</h2>
-            <h3><a href="https://forms.gle/q5HaN43HyVXLSLmM9">Submit your feedback here</a></h3>
+            <h3><a href="https://github.com/os-hackathon/amd-rocm-codelabs/issues/new">Submit your feedback here</a></h3>
         </div>
 </body>
 </html>

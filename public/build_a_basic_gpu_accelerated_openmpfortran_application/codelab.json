@@ -3,7 +3,7 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2020-10-13T20:37:12Z",
+  "updated": "2020-10-27T18:21:23Z",
   "id": "URL",
   "duration": 65,
   "title": "Building a basic GPU accelerated application with OpenMP in Fortran",
